@@ -1,0 +1,11 @@
+{
+	"autoload" : {
+		"psr-4" : {
+			"Hwacom\\APT_Parsing\\" : "src"
+		}
+	},
+	"name" : "hwacom/APT_Parsing",
+	"require" : {
+		"php" : ">=7.2"
+	}
+}
