@@ -1,5 +1,5 @@
 <?php
-namespace Hwacom\APT_Parsing_Core\dao;
+namespace Hwacom\APT_Parsing\dao;
 
 class DatabaseAccessObject {
     private $mysql_address = "";
@@ -107,7 +107,8 @@ class DatabaseAccessObject {
         } else {
             $this->last_id = mysqli_insert_id($this->link);
             return $this->last_id;
-        }*/
+        }
+        */
     }
     
     /**

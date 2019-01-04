@@ -1,8 +1,9 @@
 <?php
-namespace Hwacom\APT_Parsing_Core;
+namespace Hwacom\APT_Parsing;
 
-use Hwacom\APT_Parsing_Core\dao\DatabaseAccessObject;
-use Hwacom\APT_Parsing_Core\utils\FileUtils;
+use Hwacom\APT_Parsing\dao\DatabaseAccessObject;
+use Hwacom\APT_Parsing\utils\FileUtils;
+use Hwacom\APT_Parsing\utils\EvalMath;
 use Throwable;
 
 require_once 'env\Config.inc';
@@ -12,17 +13,43 @@ class BulkStatsParsingAndKpi
     private $table_mapping = null;
     private $field_mapping = null;
     private $field_type_mapping = null;
+    private $kpi_formula = null;
+    private $config_map = null;
+    private $value_map = null;              //紀錄當下解析的檔案內容，每個欄位對應的值，用以後續計算KPI時使用
+    
+    private $c_hostname = null;
+    private $c_epochtime = null;
+    private $c_localdate = null;
+    private $c_localtime = null;
+    private $c_uptime = null;
     
     public function __construct() {
         $this->table_mapping = array();
         $this->field_mapping = array();
         $this->field_type_mapping = array();
+        $this->kpi_formula = array();
+        $this->config_map = array();
+        $this->value_map = array();
+        
+        $this->c_hostname = null;
+        $this->c_epochtime = null;
+        $this->c_localdate = null;
+        $this->c_localtime = null;
+        $this->c_uptime = null;
     }
     
     public function __destruct() {
-        unset($this->table_mapping);
-        unset($this->field_mapping);
-        unset($this->field_type_mapping);
+        unset($GLOBALS['table_mapping']);
+        unset($GLOBALS['field_mapping']);
+        unset($GLOBALS['field_type_mapping']);
+        unset($GLOBALS['kpi_formula']);
+        unset($GLOBALS['config_map']);
+        unset($GLOBALS['value_map']);
+        unset($GLOBALS['c_hostname']);
+        unset($GLOBALS['c_epochtime']);
+        unset($GLOBALS['c_localdate']);
+        unset($GLOBALS['c_localtime']);
+        unset($GLOBALS['c_uptime']);
     }
       
     public function execute() {
@@ -31,31 +58,49 @@ class BulkStatsParsingAndKpi
             /*
              * Step 1. 初始化DB連線
              */
+            echo "Step 1. 初始化DB連線\n";
             $DAO = new DatabaseAccessObject(MYSQL_ADDRESS, MYSQL_USER_NAME, MYSQL_PASSWORD, MYSQL_DB_NAME);
             
             /*
-             * Step 2-1. 查詢期初資料 (SYS_TABLE_MAPPING)
+             * Step 2-1. 查詢期初資料 (SYS_TABLE_MAPPING : 欄位對照表)
              */
+            echo "Step 2-1. 查詢期初資料 (SYS_TABLE_MAPPING : 欄位對照表)\n";
             $dataset = $DAO->query(TABLE_SYS_TABLE_MAPPING, DEFAULT_CONDITION, ORDER_BY_FOR_SYS_TABLE_MAPPING, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-2. 轉換成mapping資料
              */
+            echo "Step 2-2. 轉換成mapping資料\n";
             $this->composeMappingMap($dataset);
             
             /*
-             * Step 2-3. 查詢期初資料 (SYS_KPI_FORMULA)
+             * Step 2-3. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)
              */
+            echo "Step 2-3. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)\n";
             $dataset = $DAO->query(TABLE_SYS_KPI_FORMULA, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-4. 轉換成mapping資料
              */
+            echo "Step 2-4. 轉換成mapping資料\n";
             $this->composeKpiMap($dataset);
+            
+            /*
+             * Step 2-5. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)
+             */
+            echo "Step 2-5. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)\n";
+            $dataset = $DAO->query(TABLE_SYS_CONFIG_SETTING, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
+            
+            /*
+             * Step 2-6. 轉換成mapping資料
+             */
+            echo "Step 2-6. 轉換成mapping資料\n";
+            $this->composeConfigMap($dataset);
             
             /*
              * Step 3-1. 取得要parsing的檔案
              */
+            echo "Step 3-1. 取得要parsing的檔案\n";
             $file_utils = new FileUtils();
             $file_paths = $file_utils->getLocalFile();
             
@@ -67,22 +112,38 @@ class BulkStatsParsingAndKpi
                 /*
                  * Step 3-2. 進行parsing作業
                  */
+                echo "Step 3-2. 進行parsing作業\n";
                 $parsing_set = $this->doParsing($path);
                 
                 /*
                  * Step 3-3. 進行KPI計算
                  */
-                $kpi_set = $this->doKpiCalculate($parsing_set);
+                echo "Step 3-3. 進行KPI計算\n";
+                $kpi_set = $this->doKpiCalculate();
+                
+                print_r($kpi_set);
+                /*
+                 * Step 3-4. 將parsing & KPI結果寫入DB
+                 */
+                echo "Step 3-4. 將parsing & KPI結果寫入DB\n";
+                $this->insertData2DB($DAO, $parsing_set, $kpi_set);
                 
                 /*
-                 * Step 3-3. 將parsing & KPI結果寫入DB
+                 * Step 3-5. 初始化
                  */
-                $this->insertData2DB($DAO, $parsing_set, $kpi_set);
-            }
+                echo "Step 3-5. 初始化全域變數\n";
+                unset($GLOBALS['value_map']);
+                unset($GLOBALS['c_hostname']);
+                unset($GLOBALS['c_epochtime']);
+                unset($GLOBALS['c_localdate']);
+                unset($GLOBALS['c_localtime']);
+                unset($GLOBALS['c_uptime']);}
             
             /*
              * Step 4. 執行完成，釋放資源
              */
+            echo "Step 4. 執行完成，釋放資源\n";
+            //unset($this->value_map);
             
         } catch (Throwable $t) {
             echo 'Caught exception: ',  $t->getMessage(), "\n";
@@ -134,7 +195,26 @@ class BulkStatsParsingAndKpi
      * @param array $dataset
      */
     private function composeKpiMap($dataset) {
-        
+        foreach ($dataset as $row) {
+            $table_name = $row[FIELD_TABLE_NAME];
+            $kpi_name = $row[FIELD_KPI_NAME];
+            $kpi_formula = $row[FIELD_KPI_FORMULA];
+            
+            $this->kpi_formula[$table_name][$kpi_name] = $kpi_formula;
+        }
+    }
+    
+    /**
+     * *組合設定檔
+     * @param array $dataset
+     */
+    private function composeConfigMap($dataset) {
+        foreach ($dataset as $row) {
+            $setting_name = $row[FIELD_SETTING_NAME];
+            $setting_value = $row[FIELD_SETTING_VALUE];
+            
+            $this->config_map[$setting_name] = $setting_value;
+        }
     }
     
     /**
@@ -167,6 +247,7 @@ class BulkStatsParsingAndKpi
                 }
                 
                 $data = array();
+                $field_value = array();
                 
                 if ($row_num >= PARSING_FILE_IGNORE_ROW_COUNT) { //檔案第一列不處理
                     if (count($fields) <= 2 || $fields[0] === END_OF_FILE) {
@@ -177,12 +258,19 @@ class BulkStatsParsingAndKpi
                     // 第二列後開始解析內容並對應到target table欄位名稱
                     $table_name = $fields[2];
                     
+                    $this->c_hostname = $hostname;
+                    $this->c_epochtime = $fields[3];
+                    $this->c_localdate = $fields[4];
+                    $this->c_localtime = $fields[5];
+                    $this->c_uptime = $fields[6];
+                    
                     for ($idx = 0; $idx < count($fields); $idx++) {
                         if (array_key_exists($table_name, $this->field_mapping)) {
                             $table_field = $this->field_mapping[$table_name];
                             
                             if (!empty($table_field[$idx])) {
                                 $data[$table_field[$idx]] = $this->checkAbnormalDataContent($table_name, $idx, $fields[$idx]);
+                                $this->value_map[$table_field[$idx]] = $this->checkAbnormalDataContent($table_name, $idx, $fields[$idx]);
                             }
                         }
                     }
@@ -226,8 +314,63 @@ class BulkStatsParsingAndKpi
      * *計算KPI數值
      * @param array $dataset
      */
-    private function doKpiCalculate($dataset) {
+    private function doKpiCalculate() {
+        $eval_math = new EvalMath();
         
+        foreach ($this->kpi_formula as $table_name => $kpi_array) {
+            foreach ($kpi_array as $kpi_name => $formula) {
+                $symbol_count = substr_count($formula, "%");
+                
+                if ($symbol_count == 0 || $symbol_count % 2 != 0) {
+                    echo "***** Formula format excepton >> formula: $formula \n";
+                    
+                } else {
+                    $part = explode("%", $formula);
+                    
+                    $before_formula = $formula;
+                    for ($i = 1; $i < count($part); $i+=2) {
+                        //echo "$table_name >> $kpi_name >> $formula >> var[$i]: $part[$i]\n";
+                        
+                        $map_key = "$part[$i]";
+                        if (!array_key_exists($map_key, $this->value_map)) {
+                            echo "***** Variable not found excepton >> variable: $map_key \n";
+                            
+                        } else {
+                            $value = $this->value_map[$map_key];
+                            $formula = str_replace("%$map_key%", $value, $formula);
+                            
+                            if (substr_count($formula, $this->config_map[CONFIG_INTERVAL_STR]) > 0) {
+                                $formula = str_replace($this->config_map[CONFIG_INTERVAL_STR], $this->config_map[CONFIG_INTERVAL], $formula);
+                            }
+                        }
+                    }
+                    /*
+                    $match = preg_match("/[\+\*\/\-]/", $formula);
+                    echo "***** formula: $formula | match : $match \n";
+                    */
+                    $match = preg_match("/%/", $formula);
+                    echo "***** formula: $formula | match : $match \n";
+                    
+                    if ($match == 0) {
+                        //$test = eval("return $formula;");
+                        $test = $eval_math->evaluate($formula);
+                        echo ">>> test: $test \n";
+                    }
+                    
+                    /*
+                    if ($match != 0) {
+                        $result = $eval_math->evaluate($formula);
+                        
+                    } else {
+                        $result = $formula;
+                    }
+                    
+                    //echo "Result: $result \n";
+                    echo "[Before]: $before_formula >> [After]:  $formula >> [Result]: $result \n";
+                    */
+                }
+            }
+        }
     }
     
     /**

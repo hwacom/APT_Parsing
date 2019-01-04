@@ -1,5 +1,5 @@
 <?php
-namespace Hwacom\APT_Parsing_Core\utils;
+namespace Hwacom\APT_Parsing\utils;
 
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
