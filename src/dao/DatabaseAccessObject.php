@@ -98,8 +98,8 @@ class DatabaseAccessObject {
         
         $this->last_sql = "INSERT INTO `" . $table . "` (" . $columns . ") VALUES (" . $data . ")";
         
-        echo "$this->last_sql\n";
-        /*
+        echo "$this->last_sql;\n";
+        
         mysqli_query($this->link, $this->last_sql);
         
         if (((is_object($this->link)) ? mysqli_error($this->link) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false))) {
@@ -108,7 +108,7 @@ class DatabaseAccessObject {
             $this->last_id = mysqli_insert_id($this->link);
             return $this->last_id;
         }
-        */
+        
     }
     
     /**

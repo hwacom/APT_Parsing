@@ -121,7 +121,6 @@ class BulkStatsParsingAndKpi
                 echo "Step 3-3. 進行KPI計算\n";
                 $kpi_set = $this->doKpiCalculate();
                 
-                print_r($kpi_set);
                 /*
                  * Step 3-4. 將parsing & KPI結果寫入DB
                  */
@@ -129,7 +128,7 @@ class BulkStatsParsingAndKpi
                 $this->insertData2DB($DAO, $parsing_set, $kpi_set);
                 
                 /*
-                 * Step 3-5. 初始化
+                 * Step 3-5. 初始化全域變數，處理下一個檔案
                  */
                 echo "Step 3-5. 初始化全域變數\n";
                 unset($GLOBALS['value_map']);
@@ -137,7 +136,8 @@ class BulkStatsParsingAndKpi
                 unset($GLOBALS['c_epochtime']);
                 unset($GLOBALS['c_localdate']);
                 unset($GLOBALS['c_localtime']);
-                unset($GLOBALS['c_uptime']);}
+                unset($GLOBALS['c_uptime']);
+            }
             
             /*
              * Step 4. 執行完成，釋放資源
@@ -247,7 +247,6 @@ class BulkStatsParsingAndKpi
                 }
                 
                 $data = array();
-                $field_value = array();
                 
                 if ($row_num >= PARSING_FILE_IGNORE_ROW_COUNT) { //檔案第一列不處理
                     if (count($fields) <= 2 || $fields[0] === END_OF_FILE) {
@@ -288,7 +287,6 @@ class BulkStatsParsingAndKpi
         
         fclose($file);
         
-        //print_r($dataset);
         return $dataset;
     }
     
@@ -315,27 +313,34 @@ class BulkStatsParsingAndKpi
      * @param array $dataset
      */
     private function doKpiCalculate() {
+        $dataset = array();
         $eval_math = new EvalMath();
         
         foreach ($this->kpi_formula as $table_name => $kpi_array) {
+            $data = array();
+            
             foreach ($kpi_array as $kpi_name => $formula) {
                 $symbol_count = substr_count($formula, "%");
                 
+                // 檢核公式結構是否正確 (欄位應以%包夾、%總數應為雙數)
                 if ($symbol_count == 0 || $symbol_count % 2 != 0) {
                     echo "***** Formula format excepton >> formula: $formula \n";
                     
                 } else {
                     $part = explode("%", $formula);
                     
-                    $before_formula = $formula;
                     for ($i = 1; $i < count($part); $i+=2) {
-                        //echo "$table_name >> $kpi_name >> $formula >> var[$i]: $part[$i]\n";
-                        
                         $map_key = "$part[$i]";
                         if (!array_key_exists($map_key, $this->value_map)) {
+                            /*
+                             * 欄位名稱若不存在於 Template 欄位範圍內則跳過 (公式期初設定應已排除掉不存在的項目)
+                             * 僅處理: card / port / system / epdg / henbgw-access / henbgw-network / diameter-auth / egtpc
+                             */
                             echo "***** Variable not found excepton >> variable: $map_key \n";
+                            continue;
                             
                         } else {
+                            // 將公式欄位替換成數值
                             $value = $this->value_map[$map_key];
                             $formula = str_replace("%$map_key%", $value, $formula);
                             
@@ -344,33 +349,31 @@ class BulkStatsParsingAndKpi
                             }
                         }
                     }
-                    /*
-                    $match = preg_match("/[\+\*\/\-]/", $formula);
-                    echo "***** formula: $formula | match : $match \n";
-                    */
+                    
+                    // 再次檢核替換數值後的公式內容是否還含有% (用來包夾欄位所使用的符號)
                     $match = preg_match("/%/", $formula);
-                    echo "***** formula: $formula | match : $match \n";
                     
                     if ($match == 0) {
-                        //$test = eval("return $formula;");
-                        $test = $eval_math->evaluate($formula);
-                        echo ">>> test: $test \n";
+                        // 呼叫API進行公式計算
+                        $kpi_value = $eval_math->evaluate($formula);
                     }
                     
-                    /*
-                    if ($match != 0) {
-                        $result = $eval_math->evaluate($formula);
-                        
-                    } else {
-                        $result = $formula;
-                    }
-                    
-                    //echo "Result: $result \n";
-                    echo "[Before]: $before_formula >> [After]:  $formula >> [Result]: $result \n";
-                    */
+                    $data[$kpi_name] = $kpi_value;
                 }
             }
+            
+            // 塞入額外所需欄位
+            $data[FIELD_TABLE_NAME] = $table_name;
+            $data[FIELD_HOST_NAME] = $this->c_hostname;
+            $data[FIELD_EPOCHTIME] = $this->c_epochtime;
+            $data[FIELD_LOCALDATE] = $this->c_localdate;
+            $data[FIELD_LOCALTIME] = $this->c_localtime;
+            $data[FIELD_UPTIME] = $this->c_uptime;
+            
+            array_push($dataset, $data);
         }
+        
+        return $dataset;
     }
     
     /**
@@ -379,8 +382,23 @@ class BulkStatsParsingAndKpi
      * @param array $kpiSet
      */
     private function insertData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
+        /*
+         * 寫入 Parsing 資料
+         */
         foreach ($parsing_set as $data) {
             $insert_table = $this->table_mapping[$data[FIELD_TABLE_NAME]];
+            
+            unset($data[FIELD_TABLE_NAME]);
+            
+            $data_array = $data;
+            $DAO->insert($insert_table, $data_array);
+        }
+        
+        /*
+         * 寫入 KPI 資料
+         */
+        foreach ($kpi_set as $data) {
+            $insert_table = $data[FIELD_TABLE_NAME];
             
             unset($data[FIELD_TABLE_NAME]);
             
