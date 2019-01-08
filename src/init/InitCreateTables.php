@@ -1,7 +1,6 @@
 <?php
-require '../vendor/autoload.php';
+require '../../vendor/autoload.php';
 
-use Hwacom\APT_Parsing\BulkStatsParsingAndKpi;
 use Hwacom\APT_Parsing\utils\LoadTemplate;
 
 
@@ -13,15 +12,15 @@ $file_kpi_path = "D:/Work/Hwacom_華電/@CASE/2018.09_亞太-ePDG_Parsing/Files/init
 
 $init_obj = new LoadTemplate();
 
-$init_obj->createKpiFormulaTable($file_kpi_path);
+//$init_obj->createKpiFormulaTable($file_kpi_path);
 
-/*
- $init_obj->createTable($file_path);
-/*
+
+//$init_obj->createTable($file_path);
+
 $init_obj->createTable($file_path);
 $init_obj->createConstraints($file_uk_path, false);
 $init_obj->createConstraints($file_summary_uk_path, true);
-*/
-/*
-$init_obj->composeSysTableMapping($file_path);
-*/
+
+
+//$init_obj->composeSysTableMapping($file_path);
+

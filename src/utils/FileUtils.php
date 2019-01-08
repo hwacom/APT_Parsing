@@ -19,13 +19,21 @@ class FileUtils {
     public function getLocalFile() {
         $files = array();
         
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PARSING_FILE_lOCAL_PATH)) as $filename)
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PARSING_FILE_lOCAL_PATH)) as $filepath)
         {
             // filter out "." and ".."
-            if ($filename->isDir()) continue;
+            if ($filepath->isDir()) continue;
             
-            $path = str_replace("\\", "/", $filename);
-            array_push($files, $path);
+            $filename = $filepath->getFilename();
+            $old_path = str_replace("\\", "/", $filepath);
+            
+            // 將檔案剪下到 Parsing system 處理資料夾
+            $new_path = PARSING_FILE_PROCESS_PATH . $filename;
+            $file_moved = rename($old_path, $new_path);
+            
+            if ($file_moved) {
+                array_push($files, $new_path);
+            }
         }
         
         return $files;

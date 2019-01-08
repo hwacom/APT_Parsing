@@ -1,18 +1,19 @@
 <?php
-namespace Hwacom\APT_Parsing;
+namespace Hwacom\APT_Parsing\service;
 
 use Hwacom\APT_Parsing\dao\DatabaseAccessObject;
 use Hwacom\APT_Parsing\utils\FileUtils;
 use Hwacom\APT_Parsing\utils\EvalMath;
 use Throwable;
 
-require_once 'env\Config.inc';
+require_once './env/Config.inc';
 
-class BulkStatsParsingAndKpi
+class EPDGParsingAndKpi
 {
     private $table_mapping = null;
     private $field_mapping = null;
     private $field_type_mapping = null;
+    private $field_subtraction_mapping = null;      //紀錄需要前後相減數值的欄位名稱
     private $kpi_formula = null;
     private $config_map = null;
     private $value_map = null;              //紀錄當下解析的檔案內容，每個欄位對應的值，用以後續計算KPI時使用
@@ -23,10 +24,19 @@ class BulkStatsParsingAndKpi
     private $c_localtime = null;
     private $c_uptime = null;
     
+    private $start_time = null;
+    private $end_time = null;
+    
     public function __construct() {
+        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
+        echo ">>>>>  START [ " . date("Y-m-d H:i:sa") . " ]\n";
+        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
+        $this->start_time = time();
+        
         $this->table_mapping = array();
         $this->field_mapping = array();
         $this->field_type_mapping = array();
+        $this->field_subtraction_mapping = array();
         $this->kpi_formula = array();
         $this->config_map = array();
         $this->value_map = array();
@@ -42,6 +52,7 @@ class BulkStatsParsingAndKpi
         unset($GLOBALS['table_mapping']);
         unset($GLOBALS['field_mapping']);
         unset($GLOBALS['field_type_mapping']);
+        unset($GLOBALS['field_subtraction_mapping']);
         unset($GLOBALS['kpi_formula']);
         unset($GLOBALS['config_map']);
         unset($GLOBALS['value_map']);
@@ -50,15 +61,33 @@ class BulkStatsParsingAndKpi
         unset($GLOBALS['c_localdate']);
         unset($GLOBALS['c_localtime']);
         unset($GLOBALS['c_uptime']);
+        
+        $this->end_time = time();
+        $spent_time = $this->end_time - $this->start_time;
+        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
+        echo "<<<<<  END [ " . date("Y-m-d H:i:sa") . " ] (執行時間: $spent_time 秒) \n";
+        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
     }
       
     public function execute() {
         try {
+            /*
+             * Step 1. 判斷 & 取得要parsing的檔案
+             */
+            echo "Step 1. 判斷 & 取得要parsing的檔案\n";
+            $file_utils = new FileUtils();
+            $file_paths = $file_utils->getLocalFile();
+            
+            if (empty($file_paths)) {
+                throw new \Exception("No files need to parsing.");
+            }
+            
+            echo "***** " . count($file_paths) . " 份檔案需處理 *****\n";
             
             /*
-             * Step 1. 初始化DB連線
+             * Step 2. 初始化DB連線
              */
-            echo "Step 1. 初始化DB連線\n";
+            echo "Step 2. 初始化DB連線\n";
             $DAO = new DatabaseAccessObject(MYSQL_ADDRESS, MYSQL_USER_NAME, MYSQL_PASSWORD, MYSQL_DB_NAME);
             
             /*
@@ -74,79 +103,110 @@ class BulkStatsParsingAndKpi
             $this->composeMappingMap($dataset);
             
             /*
-             * Step 2-3. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)
+             * Step 2-3. 查詢期初資料 (SYS_SUBTRACTION_MAPPING : 欄位對照表)
              */
-            echo "Step 2-3. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)\n";
-            $dataset = $DAO->query(TABLE_SYS_KPI_FORMULA, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
+            echo "Step 2-3. 查詢期初資料 (SYS_SUBTRACTION_MAPPING : 欄位對照表)\n";
+            $dataset = $DAO->query(TABLE_SYS_SUBTRACTION_MAPPING, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-4. 轉換成mapping資料
              */
             echo "Step 2-4. 轉換成mapping資料\n";
-            $this->composeKpiMap($dataset);
+            $this->composeSubtractionMap($dataset);
             
             /*
-             * Step 2-5. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)
+             * Step 2-5. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)
              */
-            echo "Step 2-5. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)\n";
-            $dataset = $DAO->query(TABLE_SYS_CONFIG_SETTING, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
+            echo "Step 2-5. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)\n";
+            $dataset = $DAO->query(TABLE_SYS_KPI_FORMULA, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-6. 轉換成mapping資料
              */
             echo "Step 2-6. 轉換成mapping資料\n";
-            $this->composeConfigMap($dataset);
+            $this->composeKpiMap($dataset);
             
             /*
-             * Step 3-1. 取得要parsing的檔案
+             * Step 2-7. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)
              */
-            echo "Step 3-1. 取得要parsing的檔案\n";
-            $file_utils = new FileUtils();
-            $file_paths = $file_utils->getLocalFile();
+            echo "Step 2-7. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)\n";
+            $dataset = $DAO->query(TABLE_SYS_CONFIG_SETTING, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
-            if (empty($file_paths)) {
-                throw new \Exception("No files need to parsing.");
-            }
+            /*
+             * Step 2-8. 轉換成mapping資料
+             */
+            echo "Step 2-8. 轉換成mapping資料\n";
+            $this->composeConfigMap($dataset);
             
+            $idx = 0;
             foreach ($file_paths as $path) {
-                /*
-                 * Step 3-2. 進行parsing作業
-                 */
-                echo "Step 3-2. 進行parsing作業\n";
-                $parsing_set = $this->doParsing($path);
+                $idx++;
+                $tmp_arr = explode("/", $path);
+                $filename = $tmp_arr[count($tmp_arr) - 1];
                 
-                /*
-                 * Step 3-3. 進行KPI計算
-                 */
-                echo "Step 3-3. 進行KPI計算\n";
-                $kpi_set = $this->doKpiCalculate();
-                
-                /*
-                 * Step 3-4. 將parsing & KPI結果寫入DB
-                 */
-                echo "Step 3-4. 將parsing & KPI結果寫入DB\n";
-                $this->insertData2DB($DAO, $parsing_set, $kpi_set);
-                
-                /*
-                 * Step 3-5. 初始化全域變數，處理下一個檔案
-                 */
-                echo "Step 3-5. 初始化全域變數\n";
-                unset($GLOBALS['value_map']);
-                unset($GLOBALS['c_hostname']);
-                unset($GLOBALS['c_epochtime']);
-                unset($GLOBALS['c_localdate']);
-                unset($GLOBALS['c_localtime']);
-                unset($GLOBALS['c_uptime']);
+                echo "============================================================================================================================================\n";
+                echo "檔案$idx : $path \n";
+                try {
+                    /*
+                     * Step 3-1. 進行parsing作業
+                     */
+                    echo "Step 3-1. 進行parsing作業\n";
+                    $parsing_set = $this->doParsing($path);
+                    
+                    /*
+                     * Step 3-2. 進行KPI計算
+                     */
+                    echo "Step 3-2. 進行KPI計算\n";
+                    $kpi_set = $this->doKpiCalculate();
+                    
+                    /*
+                     * Step 3-3. 將parsing & KPI結果寫入DB
+                     */
+                    echo "Step 3-3. 將parsing & KPI結果寫入DB\n";
+                    $this->insertData2DB($DAO, $parsing_set, $kpi_set);
+                    
+                    /*
+                     ** 處理成功則將檔案移至SUCCESS資料夾
+                     */
+                    echo "Step 3-4. 將檔案移動至 success 資料夾\n";
+                    $new_path = PARSING_FILE_PROCESS_SUCCESS_PATH . $filename;
+                    rename($path, $new_path);
+                    
+                } catch (Throwable $t) {
+                    echo 'Caught exception: ',  $t->getMessage(), "\n";
+                    
+                    /*
+                     ** 處理失敗則將檔案移至ERROR資料夾
+                     */
+                    echo "Step 3-4. 將檔案移動至 error 資料夾\n";
+                    $new_path = PARSING_FILE_PROCESS_ERROR_PATH . $filename;
+                    rename($path, $new_path);
+                    continue;
+                    
+                } finally { 
+                    /*
+                     * Step 3-4. 初始化全域變數，處理下一個檔案
+                     */
+                    echo "Step 3-4. 初始化全域變數\n";
+                    unset($GLOBALS['value_map']);
+                    unset($GLOBALS['c_hostname']);
+                    unset($GLOBALS['c_epochtime']);
+                    unset($GLOBALS['c_localdate']);
+                    unset($GLOBALS['c_localtime']);
+                    unset($GLOBALS['c_uptime']);
+                }
             }
             
+            echo "============================================================================================================================================\n";
+            
+        } catch (Throwable $t) {
+            echo 'Caught exception: ',  $t->getMessage(), "\n";
+            
+        } finally {
             /*
              * Step 4. 執行完成，釋放資源
              */
             echo "Step 4. 執行完成，釋放資源\n";
-            //unset($this->value_map);
-            
-        } catch (Throwable $t) {
-            echo 'Caught exception: ',  $t->getMessage(), "\n";
         }
     }
     
@@ -188,6 +248,18 @@ class BulkStatsParsingAndKpi
         print_r($this->field_mapping);
         echo "========================================================================\n";
         */
+    }
+    
+    /**
+     * *組合需要前後數值相減的欄位名稱參照表 for 後續parsing時計算使用
+     * @param array $dataset
+     */
+    private function composeSubtractionMap($dataset) {
+        foreach ($dataset as $row) {
+            $field_name = $row[FIELD_NAME];
+            
+            $this->field_subtraction_mapping[$field_name] = 1;
+        }
     }
     
     /**
@@ -263,13 +335,45 @@ class BulkStatsParsingAndKpi
                     $this->c_localtime = $fields[5];
                     $this->c_uptime = $fields[6];
                     
+                    /*
+                     ** 查找當前處理的TABLE的前一筆資料
+                     */
+                    $DAO = new DatabaseAccessObject(MYSQL_ADDRESS, MYSQL_USER_NAME, MYSQL_PASSWORD, MYSQL_DB_NAME);
+                    $db_table_name = $this->table_mapping[$table_name];
+                    
+                    $last_record_set = $DAO->query($db_table_name, DEFAULT_CONDITION, "`epochtime` DESC", QUERY_ALL, LIMIT_1_ROW);
+                    
                     for ($idx = 0; $idx < count($fields); $idx++) {
                         if (array_key_exists($table_name, $this->field_mapping)) {
-                            $table_field = $this->field_mapping[$table_name];
+                            $table_field_array = $this->field_mapping[$table_name];
                             
-                            if (!empty($table_field[$idx])) {
-                                $data[$table_field[$idx]] = $this->checkAbnormalDataContent($table_name, $idx, $fields[$idx]);
-                                $this->value_map[$table_field[$idx]] = $this->checkAbnormalDataContent($table_name, $idx, $fields[$idx]);
+                            if (!empty($table_field_array[$idx])) {
+                                $field_name = $table_field_array[$idx];
+                                $field_value = $fields[$idx];
+                                
+                                if (!empty($last_record_set)) {
+                                    /*
+                                     ** 若有前一筆資料，比對當前處理的欄位是否有設定需要做數值相減
+                                     */
+                                    $field_var = "%$field_name%";   //轉換為DB內設地的欄位名稱格式(前後以%包夾)
+                                    
+                                    if (array_key_exists($field_var, $this->field_subtraction_mapping)) {
+                                        /*
+                                         ** 若此欄位有設定要做數值相減，則將當前CSV讀取的欄位值($field_value)減掉DB內前一筆紀錄的值($last_record)
+                                         */
+                                        $last_record = $last_record_set[0];
+                                        $last_value = $last_record[$field_name];
+                                        
+                                        if (empty($field_value)) {
+                                            $field_value = 0;
+                                        }
+                                        //echo "table_name: $db_table_name , field_name: $field_name , field_value: $field_value , last_value: $last_value \n";
+                                        $field_value -= $last_value;
+                                    }
+                                }
+                                
+                                $data[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
+                                $this->value_map[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
                             }
                         }
                     }
@@ -333,8 +437,8 @@ class BulkStatsParsingAndKpi
                         $map_key = "$part[$i]";
                         if (!array_key_exists($map_key, $this->value_map)) {
                             /*
-                             * 欄位名稱若不存在於 Template 欄位範圍內則跳過 (公式期初設定應已排除掉不存在的項目)
-                             * 僅處理: card / port / system / epdg / henbgw-access / henbgw-network / diameter-auth / egtpc
+                             ** 欄位名稱若不存在於 Template 欄位範圍內則跳過 (公式期初設定應已排除掉不存在的項目)
+                             ** 僅處理: card / port / system / epdg / henbgw-access / henbgw-network / diameter-auth / egtpc
                              */
                             echo "***** Variable not found excepton >> variable: $map_key \n";
                             continue;
@@ -383,7 +487,7 @@ class BulkStatsParsingAndKpi
      */
     private function insertData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
         /*
-         * 寫入 Parsing 資料
+         ** 寫入 Parsing 資料
          */
         foreach ($parsing_set as $data) {
             $insert_table = $this->table_mapping[$data[FIELD_TABLE_NAME]];
@@ -395,7 +499,7 @@ class BulkStatsParsingAndKpi
         }
         
         /*
-         * 寫入 KPI 資料
+         ** 寫入 KPI 資料
          */
         foreach ($kpi_set as $data) {
             $insert_table = $data[FIELD_TABLE_NAME];

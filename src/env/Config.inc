@@ -8,6 +8,10 @@
 
     // [Parsing 郎砞﹚] ======================================================================================================
     const PARSING_FILE_lOCAL_PATH = "D:/Work/Hwacom_地筿/@CASE/2018.09_ㄈび-ePDG_Parsing/Files/source/";    // 郎隔畖
+    const PARSING_FILE_PROCESS_PATH = "D:/Work/Hwacom_地筿\@CASE/2018.09_ㄈび-ePDG_Parsing/Files/process/";     // 矪瞶い郎ヘ魁
+    const PARSING_FILE_PROCESS_SUCCESS_PATH = "D:/Work/Hwacom_地筿\@CASE/2018.09_ㄈび-ePDG_Parsing/Files/process/success/"; // 矪瞶Θ郎ヘ魁
+    const PARSING_FILE_PROCESS_ERROR_PATH = "D:/Work/Hwacom_地筿\@CASE/2018.09_ㄈび-ePDG_Parsing/Files/process/error/"; // 矪瞶ア毖郎ヘ魁
+    
     const PARSING_FILE_IGNORE_ROW_COUNT = 1;            // 砞﹚郎ず甧秨繷┛菠ぃ矪瞶︽计
     const PARSING_HOST_NAME_SPLIT_SYMBOLS = array(      // 砞﹚ノㄓ秆猂郎眔[HOST_NAME]㏕﹚泊 (ノ泊ち澄郎皚[0]=HOST_NAME)
         "_bulkstats"
@@ -28,8 +32,10 @@
     
     // [╰参ㄏノTABLE嘿砞﹚] ====================================================================================================
     const TABLE_SYS_TABLE_MAPPING = "sys_table_mapping";
+    const TABLE_SYS_SUBTRACTION_MAPPING = "sys_subtraction_setting";
     const TABLE_SYS_KPI_FORMULA = "kpi_formula_setting";
     const TABLE_SYS_CONFIG_SETTING = "sys_config_setting";
+    const TABLE_SYS_SUMMARY_TABLE_LIST = "sys_summary_table_list";
     // =======================================================================================================================
     
     // [╰参闽把计砞﹚] =========================================================================================================
@@ -37,6 +43,7 @@
     const DEFAULT_CONDITION = "1=1";                // 箇砞WHERE兵ン
     const DEFAULT_ORDER_BY = "1";                   // 箇砞ORDER BYよΑ
     const DEFAULT_LIMIT = "";                       // 箇砞LIMIT兵ン
+    const LIMIT_1_ROW = "LIMIT 1";                  // 眔1掸戈
     const QUERY_ALL = "*";                          // Query allボΑ
     const FIELD_TABLE_NAME = "table_name";          // 盽计﹚竡
     const FIELD_ID = "id";                          // 盽计﹚竡
@@ -52,14 +59,27 @@
     const FIELD_SETTING_NAME = "setting_name";      // 盽计﹚竡
     const FIELD_SETTING_VALUE = "setting_value";    // 盽计﹚竡
     const FIELD_HOSTNAME = "hostname";              // 盽计﹚竡
+    const FIELD_TYPE = "type";                      // 盽计﹚竡
+    const FIELD_SUB_TYPE = "sub_type";              // 盽计﹚竡
+    const FIELD_CREATE_DATE = "create_date";        // 盽计﹚竡
+    const FIELD_CREATE_TIME = "create_time";        // 盽计﹚竡
+    const FIELD_LOCAL_TIME = "local_time";          // 盽计﹚竡
+    const FIELD_FREQUENCY = "frequency";            // 盽计﹚竡
     const FIELD_EPOCHTIME = "epochtime";            // 盽计﹚竡
     const FIELD_LOCALDATE = "localdate";            // 盽计﹚竡
     const FIELD_LOCALTIME = "localtime";            // 盽计﹚竡
     const FIELD_UPTIME = "uptime";                  // 盽计﹚竡
+    const FIELD_NAME = "field_name";                // 盽计﹚竡
+    const FIELD_TABLE_TYPE = "table_type";          // 盽计﹚竡
+    const FIELD_AGGREGATION_TYPE = "aggregation_type";    // 盽计﹚竡
     
     const MAPPING_TYPE_TABLE = "TABLE";             // 盽计﹚竡
     const MAPPING_TYPE_FIELD = "FIELD";             // 盽计﹚竡
     
     const CONFIG_INTERVAL_STR = "INTERVAL_STR";     // 盽计﹚竡
     const CONFIG_INTERVAL = "INTERVAL";             // 盽计﹚竡
+    // =======================================================================================================================
+    
+    // [ePDG summary 把计砞﹚] =========================================================================================================
+    const EPDG_SUMMARY_TIME_INTERVAL = "120";        // 砞﹚Summary璸衡丁跋丁(虫: だ)
     // =======================================================================================================================

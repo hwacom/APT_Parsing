@@ -16,6 +16,7 @@ class LoadTemplate
         "vpnid"										=> "string",
         "vpnname"									=> "string",
         "ipaddr"									=> "string",
+        "card"										=> "string",
         "port"										=> "string",
         "servertype"								=> "string",
         "group"										=> "string",
@@ -24,6 +25,12 @@ class LoadTemplate
         "hostname"									=> "string",
         "type"										=> "string",
         "sub_type"									=> "string"
+    );
+    private $specify_aggregation_fields = array(
+        "cpu0-name"                                 => "[VALUE]",
+        "cpu1-name"                                 => "[VALUE]",
+        "cpu2-name"                                 => "[VALUE]",
+        "cpu3-name"                                 => "[VALUE]"
     );
     private $fields_type = array(
         "epochtime"                                 => "int(11)",
@@ -59,6 +66,7 @@ class LoadTemplate
         "vpnid"										=> "varchar(50)",
         "vpnname"									=> "varchar(50)",
         "ipaddr"									=> "varchar(50)",
+        "card"										=> "varchar(50)",
         "port"										=> "varchar(50)",
         "servertype"								=> "varchar(50)",
         "group"										=> "varchar(50)",
@@ -138,8 +146,8 @@ class LoadTemplate
                        ."   `hostname` varchar(50) not null, "
                        ."   `type` varchar(30) not null, "
                        ."   `sub_type` varchar(50) not null, "
-                       ."   `create_time` int(11) not null, "
-                       ."   `local_time` int(14) not null, "
+                       ."   `create_date` int(8) not null, "
+                       ."   `create_time` int(6) not null, "
                        ."   `frequency` varchar(20) not null, ";
                         
             for ($idx = 3; $idx < count($fields); $idx++) {
@@ -163,11 +171,16 @@ class LoadTemplate
                 
                 if ($idx > 6) {
                     if (!in_array($field_name, $this->key_fields)) {
-                        for ($idx2 = 0; $idx2 < count($this->aggregation_fields); $idx2++) {
-                            $sql_aggregation = $sql_aggregation."`".$field_name.$this->aggregation_fields[$idx2]."` ".$type_str." null ";
+                        if (array_key_exists($field_name, $this->specify_aggregation_fields)) {
+                            $sql_aggregation = $sql_aggregation." `".$field_name."` ".$this->fields_type[$field_name]." null, ";
                             
-                            if ($idx2 < count($this->aggregation_fields)-1 || $idx < count($fields)-1) {
-                                $sql_aggregation = $sql_aggregation.", ";
+                        } else {
+                            for ($idx2 = 0; $idx2 < count($this->aggregation_fields); $idx2++) {
+                                $sql_aggregation = $sql_aggregation."`".$field_name.$this->aggregation_fields[$idx2]."` ".$type_str." null ";
+                                
+                                if ($idx2 < count($this->aggregation_fields)-1 || $idx < count($fields)-1) {
+                                    $sql_aggregation = $sql_aggregation.", ";
+                                }
                             }
                         }
                         
@@ -333,10 +346,14 @@ class LoadTemplate
             
             $table_name = $fields[2];
             for ($idx = 0; $idx < count($fields); $idx++) {
-                $sql = "INSERT INTO `sys_table_mapping` (`mapping_id`, `table_name`, `mapping_type`, `ori_name`, `target_name`, `order_num`, `data_type`) VALUES (UUID(), '$table_name', 'FIELD', ";
+                $sql = "INSERT INTO `sys_table_mapping` (`mapping_id`, `table_name`, `mapping_type`, `ori_name`, `target_name`, `order_num`, `data_type`, `aggregation_type`) VALUES (UUID(), '$table_name', 'FIELD', ";
                 
                 $field_name = ($idx < 3) ? $this->csv_column_mapping[$idx] : $fields[$idx];
                 $field_name = trim(str_replace("%", "", $field_name));
+                
+                if (empty($field_name)) {
+                    continue;
+                }
                 
                 $sql = $sql."'$field_name', '".$field_name."', ".($idx+1);
                 
@@ -345,7 +362,19 @@ class LoadTemplate
                     $data_type = $this->specify_type_fields[$field_name];
                 }
                 
-                $sql = $sql.", '".$data_type."');";
+                $sql = $sql.", '".$data_type."' ";
+                
+                if ($data_type === "number") {
+                    $sql = $sql.", 'AVG');";
+                    
+                } else if ($data_type === "string") {
+                    if (array_key_exists($field_name, $this->specify_aggregation_fields)) {
+                        $sql = $sql.", '[VALUE]');";
+                        
+                    } else {
+                        $sql = $sql.", '[KEY]');";
+                    }
+                }
                 
                 echo $sql."\n";
             } 
