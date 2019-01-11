@@ -1,10 +1,12 @@
 <?php
 namespace Hwacom\APT_Parsing\utils;
+require_once dirname(__FILE__).'/../env/Config.inc';
 
 class LoadTemplate
 {
     //private $default_type = "decimal(11,2)";
-    private $default_type = "decimal(18,2)";
+    private $default_type = "decimal(30,2)";
+    private $default_summary_type = "decimal(40,2)";
     private $specify_type_fields = array(
         "cpu0-name"									=> "string",
         "cpu1-name"									=> "string",
@@ -21,16 +23,28 @@ class LoadTemplate
         "servertype"								=> "string",
         "group"										=> "string",
         "peer"										=> "string",
-        "tun-sent-delsessrespdeniedMandIEIncorrect"	=> "string",
         "hostname"									=> "string",
         "type"										=> "string",
-        "sub_type"									=> "string"
+        "sub_type"									=> "string",
+        "tun-sent-delsessrespdeniedMandIEIncorrect"	=> "string"
     );
     private $specify_aggregation_fields = array(
         "cpu0-name"                                 => "[VALUE]",
         "cpu1-name"                                 => "[VALUE]",
         "cpu2-name"                                 => "[VALUE]",
-        "cpu3-name"                                 => "[VALUE]"
+        "cpu3-name"                                 => "[VALUE]",
+        "servname"									=> "[VALUE]",
+        "vpnname"									=> "[VALUE]",
+        "servid"									=> "[VALUE]",
+        "vpnid"										=> "[VALUE]",
+        "vpnname"									=> "[VALUE]",
+        "ipaddr"									=> "[VALUE]",
+        "card"										=> "[VALUE]",
+        "port"										=> "[VALUE]",
+        "servertype"								=> "[VALUE]",
+        "group"										=> "[VALUE]",
+        "peer"										=> "[VALUE]",
+        "tun-sent-delsessrespdeniedMandIEIncorrect"	=> "[VALUE]"
     );
     private $fields_type = array(
         "epochtime"                                 => "int(11)",
@@ -131,11 +145,19 @@ class LoadTemplate
             }
             
             $sql = "create table ";
+            $sql_temp = "create table ";
             $sql_aggregation = "create table ";
             
             $table_name = $this->transTableName($fields[2]);
+            $temp_table_name = $table_name."_temp";
             
             $sql = $sql.$table_name
+                       ." ( `id` bigint(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
+                       ."   `hostname` varchar(50) not null, "
+                       ."   `type` varchar(30) not null, "
+                       ."   `sub_type` varchar(50) not null, ";
+            
+            $sql_temp = $sql_temp.$temp_table_name
                        ." ( `id` bigint(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
                        ."   `hostname` varchar(50) not null, "
                        ."   `type` varchar(30) not null, "
@@ -148,7 +170,9 @@ class LoadTemplate
                        ."   `sub_type` varchar(50) not null, "
                        ."   `create_date` int(8) not null, "
                        ."   `create_time` int(6) not null, "
-                       ."   `frequency` varchar(20) not null, ";
+                       ."   `frequency` varchar(20) not null, "
+                       ."   `interval_begin` varchar(14) not null, "
+                       ."   `interval_end` varchar(14) not null, ";
                         
             for ($idx = 3; $idx < count($fields); $idx++) {
                 if (empty($fields[$idx])) {
@@ -162,11 +186,14 @@ class LoadTemplate
                 }
                 
                 $type_str = array_key_exists($field_name, $this->fields_type) ? $this->fields_type[$field_name] : $this->default_type;
+                $type_summary_str = array_key_exists($field_name, $this->fields_type) ? $this->fields_type[$field_name] : $this->default_summary_type;
                 
                 $sql = $sql."`".$field_name."` ".$type_str.(!in_array($field_name, $this->key_fields) ? ' null ' : ' not null ');
+                $sql_temp = $sql_temp."`".$field_name."` ".$type_str.(!in_array($field_name, $this->key_fields) ? ' null ' : ' not null ');
                 
                 if ($idx < count($fields)-1) {
                     $sql = $sql.", ";
+                    $sql_temp = $sql_temp.", ";
                 }
                 
                 if ($idx > 6) {
@@ -176,7 +203,7 @@ class LoadTemplate
                             
                         } else {
                             for ($idx2 = 0; $idx2 < count($this->aggregation_fields); $idx2++) {
-                                $sql_aggregation = $sql_aggregation."`".$field_name.$this->aggregation_fields[$idx2]."` ".$type_str." null ";
+                                $sql_aggregation = $sql_aggregation."`".$field_name.$this->aggregation_fields[$idx2]."` ".$type_summary_str." null ";
                                 
                                 if ($idx2 < count($this->aggregation_fields)-1 || $idx < count($fields)-1) {
                                     $sql_aggregation = $sql_aggregation.", ";
@@ -185,7 +212,7 @@ class LoadTemplate
                         }
                         
                     } else {
-                        $sql_aggregation = $sql_aggregation."`".$field_name."` ".$type_str." not null";
+                        $sql_aggregation = $sql_aggregation."`".$field_name."` ".$type_summary_str." not null";
                         
                         if ($idx < count($fields)-1) {
                             $sql_aggregation = $sql_aggregation.", ";
@@ -195,9 +222,11 @@ class LoadTemplate
             }
             
             $sql = $sql." );";
+            $sql_temp = $sql_temp." );";
             $sql_aggregation = $sql_aggregation." );";
                       
             echo $sql."\n";
+            echo $sql_temp."\n";
             echo $sql_aggregation."\n";
             
             $row_idx++;
@@ -206,10 +235,17 @@ class LoadTemplate
         fclose($file);
     }
     
-    public function createKpiFormulaTable($file_path) {
+    /**
+     ** 建立 KPI table OR KPI_FORMULA_SETTING
+     * @param string $file_path
+     * @param string $show_type ("F":只建立KPI_FORMULA_SETTING / "T":只建立KPI TABLE / "A":兩者都執行)
+     */
+    public function createKpiFormulaTable($file_path, $show_type) {
         $file = fopen($file_path,"r");
         
         $table_map = array();
+        $table_field_map = array();
+        
         $row_idx = 0;
         $ignore_rows = 1;
         while(!feof($file))
@@ -235,45 +271,82 @@ class LoadTemplate
                 continue;
             }
             
-            if (array_key_exists($table_name, $table_map)) {
-                $sql = $table_map[$table_name];
-                
-            } else {
-                $sql = $sql." `id` bigint(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
-                           ."  `hostname` varchar(50) not null, "
-                           ."  `epochtime` int(11) not null, "
-                           ."  `localdate` int(11) not null, "
-                           ."  `localtime` int(11) not null, "
-                           ."  `uptime` int(11) not null, ";
+            if ($show_type != "T") {
+                $insert_sql = "insert into `".TABLE_SYS_KPI_FORMULA."` (`table_name`, `catelog`, `kpi_name`, `kpi_formula`, `aggregation_type`) values ( "
+                                    ."'".$fields[1]."', "
+                                    ."'".$fields[2]."', "
+                                    ."'".$fields[3]."', "
+                                    ."'".$fields[4]."', "
+                                    ."'".$fields[5]."' );";
+                echo $insert_sql."\n";
             }
-            
-            $sql = $sql."`".$field_name."` decimal(15,6) null, ";
-            
-            $table_map[$table_name] = $sql;
-            
-            
-            $insert_sql = "insert into `kpi_formula_setting` (`table_name`, `catelog`, `kpi_name`, `kpi_formula`, `aggregation_type`) values ( "
-                          ."'".$fields[1]."', "
-                          ."'".$fields[2]."', "
-                          ."'".$fields[3]."', "
-                          ."'".$fields[4]."', "
-                          ."'".$fields[5]."' );";
-            echo $insert_sql."\n";
+                                
+            if ($show_type != "F") {
+                if (array_key_exists($table_name, $table_map)) {
+                    $sql = $table_map[$table_name];
+                    
+                } else {
+                    $sql = $sql." `id` bigint(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
+                                        ."  `hostname` varchar(50) not null, "
+                                        ."  `epochtime` int(11) not null, "
+                                        ."  `localdate` int(11) not null, "
+                                        ."  `localtime` int(11) not null, "
+                                        ."  `uptime` int(11) not null, ";
+                }
+                
+                $sql = $sql."`".$field_name."` $this->default_type null, ";
+                
+                $table_map[$table_name] = $sql;
+                
+                if (!array_key_exists($table_name, $table_field_map)) {
+                    $table_field_map[$table_name] = array();
+                }
+                
+                $field_array = $table_field_map[$table_name];
+                $field_array[$field_name] = " $this->default_summary_type null";
+                
+                $table_field_map[$table_name] = $field_array;
+            }
             
             $row_idx++;
         }
         
-        $sql = "";
-        foreach ($table_map as $key => $value) {
-            $sql = " create table "
-                   ." `".$key."` "  //Table name
-                   ." ( "
-                   .substr($value, 0, strlen($value)-2)          //Table fields
-                   ." ); ";
+        if ($show_type != "F") {
+            $sql = "";
+            foreach ($table_map as $key => $value) {
+                $sql = " create table "
+                            ." `".strtolower($key)."` "  //Table name
+                            ." ( "
+                            .substr($value, 0, strlen($value)-2)          //Table fields
+                            ." ); ";
+                        
+                echo $sql."\n";
+            }
             
-            echo $sql."\n";
+            foreach ($table_field_map as $key => $value) {
+                
+                $sql_aggregation = " create table "
+                                        ." `".strtolower($key)."_summary` "  //Table name
+                                        ." ( "
+                                        ."  `id` bigint(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
+                                        ."  `hostname` varchar(50) not null, "
+                                        ."  `create_date` int(8) not null, "
+                                        ."  `create_time` int(6) not null, "
+                                        ."  `frequency` varchar(20) not null, "
+                                        ."  `interval_begin` varchar(14) not null, "
+                                        ."  `interval_end` varchar(14) not null ";
+                
+                foreach ($value as $field_name => $type_str) {
+                    for ($idx = 0; $idx < count($this->aggregation_fields); $idx++) {
+                        
+                        $sql_aggregation = $sql_aggregation.", `".$field_name.$this->aggregation_fields[$idx]."` ".$type_str." ";
+                    }
+                }
+                
+                $sql_aggregation = $sql_aggregation." ); ";
+                echo $sql_aggregation."\n";
+            }
         }
-        
         
         fclose($file);
     }
@@ -282,7 +355,7 @@ class LoadTemplate
      * **提供以CSV檔轉換出 ALTER TABLE ___ ADD CONSTRAINT ___ 的SQL
      * @param String $file_path
      */
-    public function createConstraints($file_path, $is_summary = false) {
+    public function createConstraints($file_path, $is_summary = null) {
         $file = fopen($file_path,"r");
         
         while(!feof($file))
@@ -302,8 +375,14 @@ class LoadTemplate
             
             $table_name = $this->transTableName($fields[0]);
             
-            if ($is_summary) {
-                $table_name = $table_name."_summary";
+            switch ($is_summary) {
+                case "SUMMARY":
+                    $table_name = $table_name."_summary";
+                    break;
+                    
+                case "TEMP":
+                    $table_name = $table_name."_temp";
+                    break;
             }
             
             $sql = $sql.$table_name
@@ -346,7 +425,7 @@ class LoadTemplate
             
             $table_name = $fields[2];
             for ($idx = 0; $idx < count($fields); $idx++) {
-                $sql = "INSERT INTO `sys_table_mapping` (`mapping_id`, `table_name`, `mapping_type`, `ori_name`, `target_name`, `order_num`, `data_type`, `aggregation_type`) VALUES (UUID(), '$table_name', 'FIELD', ";
+                $sql = "INSERT INTO `".TABLE_SYS_TABLE_MAPPING."` (`mapping_id`, `table_name`, `mapping_type`, `ori_name`, `target_name`, `order_num`, `data_type`, `aggregation_type`) VALUES (UUID(), '$table_name', 'FIELD', ";
                 
                 $field_name = ($idx < 3) ? $this->csv_column_mapping[$idx] : $fields[$idx];
                 $field_name = trim(str_replace("%", "", $field_name));

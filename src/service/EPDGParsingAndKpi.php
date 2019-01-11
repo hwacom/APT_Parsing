@@ -1,18 +1,21 @@
 <?php
-namespace Hwacom\APT_Parsing\service;
+date_default_timezone_set("Asia/Taipei");
+require __DIR__ . '/../../vendor/autoload.php';
+require_once dirname(__FILE__).'/../../vendor/apache/log4php/src/main/php/Logger.php';
+require_once dirname(__FILE__).'/../env/Config.inc';
 
 use Hwacom\APT_Parsing\dao\DatabaseAccessObject;
 use Hwacom\APT_Parsing\utils\FileUtils;
 use Hwacom\APT_Parsing\utils\EvalMath;
-use Throwable;
-
-require_once './env/Config.inc';
 
 class EPDGParsingAndKpi
 {
+    private $logger = null;
+    
     private $table_mapping = null;
     private $field_mapping = null;
     private $field_type_mapping = null;
+    private $table_uk_mapping = null;               //記錄每張表的UK欄位
     private $field_subtraction_mapping = null;      //紀錄需要前後相減數值的欄位名稱
     private $kpi_formula = null;
     private $config_map = null;
@@ -28,14 +31,18 @@ class EPDGParsingAndKpi
     private $end_time = null;
     
     public function __construct() {
-        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
-        echo ">>>>>  START [ " . date("Y-m-d H:i:sa") . " ]\n";
-        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
+        Logger::configure(dirname(__FILE__).'/../env/log4php_parsing.xml');
+        $this->logger = Logger::getLogger('file');
+        
+        $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
+        $this->logger->info( ">>>>>  START [ " . date("Y-m-d H:i:sa") . " ]" );
+        $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
         $this->start_time = time();
         
         $this->table_mapping = array();
         $this->field_mapping = array();
         $this->field_type_mapping = array();
+        $this->table_uk_mapping = array();
         $this->field_subtraction_mapping = array();
         $this->kpi_formula = array();
         $this->config_map = array();
@@ -52,6 +59,7 @@ class EPDGParsingAndKpi
         unset($GLOBALS['table_mapping']);
         unset($GLOBALS['field_mapping']);
         unset($GLOBALS['field_type_mapping']);
+        unset($GLOBALS['table_uk_mapping']);
         unset($GLOBALS['field_subtraction_mapping']);
         unset($GLOBALS['kpi_formula']);
         unset($GLOBALS['config_map']);
@@ -64,9 +72,11 @@ class EPDGParsingAndKpi
         
         $this->end_time = time();
         $spent_time = $this->end_time - $this->start_time;
-        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
-        echo "<<<<<  END [ " . date("Y-m-d H:i:sa") . " ] (執行時間: $spent_time 秒) \n";
-        echo "---------------------------------------------------------------------------------------------------------------------------------------------\n";
+        $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
+        $this->logger->info( "<<<<<  END [ " . date("Y-m-d H:i:sa") . " ] (執行時間: $spent_time 秒) " );
+        $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
+        
+        $this->logger = null;
     }
       
     public function execute() {
@@ -74,68 +84,69 @@ class EPDGParsingAndKpi
             /*
              * Step 1. 判斷 & 取得要parsing的檔案
              */
-            echo "Step 1. 判斷 & 取得要parsing的檔案\n";
+            $this->logger->info( "Step 1. 判斷 & 取得要parsing的檔案" );
             $file_utils = new FileUtils();
             $file_paths = $file_utils->getLocalFile();
             
             if (empty($file_paths)) {
-                throw new \Exception("No files need to parsing.");
+                throw new Exception("No files need to parsing.");
             }
             
-            echo "***** " . count($file_paths) . " 份檔案需處理 *****\n";
+            $this->logger->info( "***** " . count($file_paths) . " 份檔案需處理 *****" );
             
             /*
              * Step 2. 初始化DB連線
              */
-            echo "Step 2. 初始化DB連線\n";
+            $this->logger->info( "Step 2. 初始化DB連線" );
             $DAO = new DatabaseAccessObject(MYSQL_ADDRESS, MYSQL_USER_NAME, MYSQL_PASSWORD, MYSQL_DB_NAME);
             
             /*
              * Step 2-1. 查詢期初資料 (SYS_TABLE_MAPPING : 欄位對照表)
              */
-            echo "Step 2-1. 查詢期初資料 (SYS_TABLE_MAPPING : 欄位對照表)\n";
+            $this->logger->info( "Step 2-1. 查詢期初資料 (SYS_TABLE_MAPPING : 欄位對照表)" );
             $dataset = $DAO->query(TABLE_SYS_TABLE_MAPPING, DEFAULT_CONDITION, ORDER_BY_FOR_SYS_TABLE_MAPPING, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-2. 轉換成mapping資料
              */
-            echo "Step 2-2. 轉換成mapping資料\n";
+            $this->logger->info( "Step 2-2. 轉換成mapping資料" );
             $this->composeMappingMap($dataset);
+            $this->composeTableUkMap($dataset);
             
             /*
              * Step 2-3. 查詢期初資料 (SYS_SUBTRACTION_MAPPING : 欄位對照表)
              */
-            echo "Step 2-3. 查詢期初資料 (SYS_SUBTRACTION_MAPPING : 欄位對照表)\n";
+            $this->logger->info( "Step 2-3. 查詢期初資料 (SYS_SUBTRACTION_MAPPING : 欄位對照表)" );
             $dataset = $DAO->query(TABLE_SYS_SUBTRACTION_MAPPING, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-4. 轉換成mapping資料
              */
-            echo "Step 2-4. 轉換成mapping資料\n";
+            $this->logger->info( "Step 2-4. 轉換成mapping資料" );
             $this->composeSubtractionMap($dataset);
             
             /*
              * Step 2-5. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)
              */
-            echo "Step 2-5. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)\n";
+            $this->logger->info( "Step 2-5. 查詢期初資料 (SYS_KPI_FORMULA : KPI公式設定檔)" );
             $dataset = $DAO->query(TABLE_SYS_KPI_FORMULA, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-6. 轉換成mapping資料
              */
-            echo "Step 2-6. 轉換成mapping資料\n";
+            $this->logger->info( "Step 2-6. 轉換成mapping資料" );
             $this->composeKpiMap($dataset);
             
             /*
              * Step 2-7. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)
              */
-            echo "Step 2-7. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)\n";
+            $this->logger->info( "Step 2-7. 查詢設定檔 (SYS_CONFIG_SETTING : 系統參數設定檔)" );
             $dataset = $DAO->query(TABLE_SYS_CONFIG_SETTING, DEFAULT_CONDITION, DEFAULT_ORDER_BY, QUERY_ALL, DEFAULT_LIMIT);
             
             /*
              * Step 2-8. 轉換成mapping資料
              */
-            echo "Step 2-8. 轉換成mapping資料\n";
+            $this->logger->info( "Step 2-8. 轉換成mapping資料" );
             $this->composeConfigMap($dataset);
             
             $idx = 0;
@@ -144,70 +155,70 @@ class EPDGParsingAndKpi
                 $tmp_arr = explode("/", $path);
                 $filename = $tmp_arr[count($tmp_arr) - 1];
                 
-                echo "============================================================================================================================================\n";
-                echo "檔案$idx : $path \n";
+                $this->logger->info( "============================================================================================================================================" );
+                $this->logger->info( "檔案$idx : $path " );
                 try {
                     /*
                      * Step 3-1. 進行parsing作業
                      */
-                    echo "Step 3-1. 進行parsing作業\n";
+                    $this->logger->info( "Step 3-1. 進行parsing作業" );
                     $parsing_set = $this->doParsing($path);
                     
                     /*
                      * Step 3-2. 進行KPI計算
                      */
-                    echo "Step 3-2. 進行KPI計算\n";
+                    $this->logger->info( "Step 3-2. 進行KPI計算" );
                     $kpi_set = $this->doKpiCalculate();
                     
                     /*
                      * Step 3-3. 將parsing & KPI結果寫入DB
                      */
-                    echo "Step 3-3. 將parsing & KPI結果寫入DB\n";
+                    $this->logger->info( "Step 3-3. 將parsing & KPI結果寫入DB" );
                     $this->insertData2DB($DAO, $parsing_set, $kpi_set);
                     
                     /*
                      ** 處理成功則將檔案移至SUCCESS資料夾
                      */
-                    echo "Step 3-4. 將檔案移動至 success 資料夾\n";
+                    $this->logger->info( "Step 3-4. 將檔案移動至 success 資料夾" );
                     $new_path = PARSING_FILE_PROCESS_SUCCESS_PATH . $filename;
                     rename($path, $new_path);
                     
-                } catch (Throwable $t) {
-                    echo 'Caught exception: ',  $t->getMessage(), "\n";
+                } catch (Exception $t) {
+                    $this->logger->info( "Caught exception:  ".$t->getMessage() );
                     
                     /*
                      ** 處理失敗則將檔案移至ERROR資料夾
                      */
-                    echo "Step 3-4. 將檔案移動至 error 資料夾\n";
+                    $this->logger->info( "Step 3-4. 將檔案移動至 error 資料夾" );
                     $new_path = PARSING_FILE_PROCESS_ERROR_PATH . $filename;
                     rename($path, $new_path);
                     continue;
                     
-                } finally { 
+                }// finally { 
                     /*
                      * Step 3-4. 初始化全域變數，處理下一個檔案
                      */
-                    echo "Step 3-4. 初始化全域變數\n";
+                    $this->logger->info( "Step 3-4. 初始化全域變數" );
                     unset($GLOBALS['value_map']);
                     unset($GLOBALS['c_hostname']);
                     unset($GLOBALS['c_epochtime']);
                     unset($GLOBALS['c_localdate']);
                     unset($GLOBALS['c_localtime']);
                     unset($GLOBALS['c_uptime']);
-                }
+                //}
             }
             
-            echo "============================================================================================================================================\n";
+            $this->logger->info( "============================================================================================================================================" );
             
-        } catch (Throwable $t) {
-            echo 'Caught exception: ',  $t->getMessage(), "\n";
+        } catch (Exception $t) {
+            $this->logger->info( "Caught exception:  ".$t->getMessage() );
             
-        } finally {
+        } //finally {
             /*
              * Step 4. 執行完成，釋放資源
              */
-            echo "Step 4. 執行完成，釋放資源\n";
-        }
+            $this->logger->info( "Step 4. 執行完成，釋放資源" );
+        //}
     }
     
     /**
@@ -222,7 +233,7 @@ class EPDGParsingAndKpi
             if ($mapping_type === MAPPING_TYPE_TABLE) {
                 $this->table_mapping[$row[FIELD_ORI_NAME]] = $row[FIELD_TARGET_NAME];
                 
-            } elseif ($mapping_type === MAPPING_TYPE_FIELD) {
+            } else if ($mapping_type === MAPPING_TYPE_FIELD) {
                 $table_name = $row[FIELD_TABLE_NAME];
                 
                 $table_array = array();
@@ -240,14 +251,37 @@ class EPDGParsingAndKpi
                 $this->field_type_mapping[$table_name] = $table_type_array;
             }
         }
-        /*
-        echo "[TABLE_MAPPING] ========================================================\n";
-        print_r($this->table_mapping);
-        echo "========================================================================\n";
-        echo "[FIELD_MAPPING] ========================================================\n";
-        print_r($this->field_mapping);
-        echo "========================================================================\n";
-        */
+    }
+    
+    private function composeTableUkMap($dataset) {
+        
+        foreach ($dataset as $row) {
+            
+            $mapping_type = $row[FIELD_MAPPING_TYPE];
+            
+            if ($mapping_type === MAPPING_TYPE_FIELD) {
+                
+                $table_name = $row[FIELD_TABLE_NAME];
+                
+                if (array_key_exists($table_name, $this->table_uk_mapping)) {
+                    $uk_field = $this->table_uk_mapping[$table_name];
+                    
+                } else {
+                    $uk_field = array();
+                }
+                
+                $target_field_name = $row[FIELD_TARGET_NAME];
+                $aggregation_type = $row[FIELD_AGGREGATION_TYPE];
+                
+                if ($aggregation_type == "[KEY]") {
+                    if (!in_array($target_field_name, $uk_field)) {
+                        array_push($uk_field, $target_field_name);
+                        
+                        $this->table_uk_mapping[$table_name] = $uk_field;
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -301,24 +335,37 @@ class EPDGParsingAndKpi
         $file_name = $path_slice[count($path_slice)-1];
         
         $hostname = 'N/A';
+        
+        if (strpos($file_name, PARSING_HOST_NAME_SPLIT_SYMBOLS)) {
+            $tmp = explode(PARSING_HOST_NAME_SPLIT_SYMBOLS, $file_name);
+            $hostname = $tmp[0];
+        }
+        /* php 5.3.3 不支援 const ARRAY
         foreach (PARSING_HOST_NAME_SPLIT_SYMBOLS as $symbol) {
             if (strpos($file_name, $symbol)) {
-                $hostname = explode($symbol, $file_name)[0];
+                $tmp = explode($symbol, $file_name);
+                $hostname = $tmp[0];
                 break;
             }
         }
+        */
         // =================================================================================================
         
         // 迴圈讀取檔案內容 ======================================================================================
         $row_num = 0;
         $file = fopen($path, "r");
         if ($file !== false) {
+            
+            $table_array = array();
+            $temp_table_array = array();
+            
             while (($fields = fgetcsv($file, 0, ",")) !== false) {
                 if (empty($fields)) {
                     continue;
                 }
                 
                 $data = array();
+                $temp_data = array();
                 
                 if ($row_num >= PARSING_FILE_IGNORE_ROW_COUNT) { //檔案第一列不處理
                     if (count($fields) <= 2 || $fields[0] === END_OF_FILE) {
@@ -336,12 +383,36 @@ class EPDGParsingAndKpi
                     $this->c_uptime = $fields[6];
                     
                     /*
-                     ** 查找當前處理的TABLE的前一筆資料
+                     ** 查找當前處理的資料類型的前一筆資料
+                     ** 以此類型的TABLE UK欄位查找
                      */
                     $DAO = new DatabaseAccessObject(MYSQL_ADDRESS, MYSQL_USER_NAME, MYSQL_PASSWORD, MYSQL_DB_NAME);
-                    $db_table_name = $this->table_mapping[$table_name];
+                    $temp_table_name = $this->table_mapping[$table_name]."_temp";
                     
-                    $last_record_set = $DAO->query($db_table_name, DEFAULT_CONDITION, "`epochtime` DESC", QUERY_ALL, LIMIT_1_ROW);
+                    $uk_field = $this->table_uk_mapping[$table_name];
+                    
+                    if (!empty($uk_field)) {
+                        $default_condition = " 1=1 ";
+                        $condition = $default_condition;
+                        for ($idx = 0; $idx < count($fields); $idx++) {
+                            if (array_key_exists($table_name, $this->field_mapping)) {
+                                $table_field_array = $this->field_mapping[$table_name];
+                                
+                                if (!empty($table_field_array[$idx])) {
+                                    $field_name = $table_field_array[$idx];
+                                    $field_value = ($field_name == FIELD_HOSTNAME) ? $hostname : $fields[$idx];
+                                    
+                                    if (in_array($field_name, $uk_field)) {
+                                        $condition = $condition." AND `".$field_name."` = '".$field_value."' ";
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if ($condition != $default_condition) {
+                            $last_record_set = $DAO->query($temp_table_name, $condition, "`epochtime` DESC", QUERY_ALL, LIMIT_1_ROW);
+                        }
+                    }
                     
                     for ($idx = 0; $idx < count($fields); $idx++) {
                         if (array_key_exists($table_name, $this->field_mapping)) {
@@ -350,6 +421,8 @@ class EPDGParsingAndKpi
                             if (!empty($table_field_array[$idx])) {
                                 $field_name = $table_field_array[$idx];
                                 $field_value = $fields[$idx];
+                                
+                                $temp_data[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
                                 
                                 if (!empty($last_record_set)) {
                                     /*
@@ -369,6 +442,10 @@ class EPDGParsingAndKpi
                                         }
                                         //echo "table_name: $db_table_name , field_name: $field_name , field_value: $field_value , last_value: $last_value \n";
                                         $field_value -= $last_value;
+                                        
+                                        if ($field_var == "mcast_inpackets") {
+                                            echo "******** fianl -- field_value: $field_value\n";
+                                        }
                                     }
                                 }
                                 
@@ -381,11 +458,18 @@ class EPDGParsingAndKpi
                     $data[FIELD_TABLE_NAME] = $table_name;
                     $data[FIELD_HOST_NAME] = $hostname;
                     
-                    array_push($dataset, $data);
+                    $temp_data[FIELD_TABLE_NAME] = $table_name."_temp";
+                    $temp_data[FIELD_HOST_NAME] = $hostname;
+                    
+                    array_push($table_array, $data);
+                    array_push($temp_table_array, $temp_data);
                 }
                 
                 $row_num++;
             }
+            
+            $dataset["MAIN"] = $table_array;
+            $dataset["TEMP"] = $temp_table_array;
         }
         // =================================================================================================
         
@@ -401,12 +485,17 @@ class EPDGParsingAndKpi
             $content = is_numeric($content) ? $content : 0;
             
         } else {
+            if ($content === ABNORMAL_SYMBOLS) {
+                $content = ABNORMAL_SYMBOL_TRANS_TO;
+            }
+            /* php 5.3.3 不支援 const ARRAY
             foreach (ABNORMAL_SYMBOLS as $symbol) {
                 if ($content === $symbol) {
                     $content = ABNORMAL_SYMBOL_TRANS_TO;
                     break;
                 }
             }
+            */
         }
         
         return $content;
@@ -428,7 +517,7 @@ class EPDGParsingAndKpi
                 
                 // 檢核公式結構是否正確 (欄位應以%包夾、%總數應為雙數)
                 if ($symbol_count == 0 || $symbol_count % 2 != 0) {
-                    echo "***** Formula format excepton >> formula: $formula \n";
+                    $this->logger->info( "***** Formula format excepton >> formula: $formula " );
                     
                 } else {
                     $part = explode("%", $formula);
@@ -440,7 +529,7 @@ class EPDGParsingAndKpi
                              ** 欄位名稱若不存在於 Template 欄位範圍內則跳過 (公式期初設定應已排除掉不存在的項目)
                              ** 僅處理: card / port / system / epdg / henbgw-access / henbgw-network / diameter-auth / egtpc
                              */
-                            echo "***** Variable not found excepton >> variable: $map_key \n";
+                            $this->logger->info( "***** Variable not found excepton >> variable: $map_key " );
                             continue;
                             
                         } else {
@@ -489,20 +578,49 @@ class EPDGParsingAndKpi
         /*
          ** 寫入 Parsing 資料
          */
-        foreach ($parsing_set as $data) {
-            $insert_table = $this->table_mapping[$data[FIELD_TABLE_NAME]];
-            
-            unset($data[FIELD_TABLE_NAME]);
-            
-            $data_array = $data;
-            $DAO->insert($insert_table, $data_array);
+        $truncated_table_host = array();
+        
+        foreach ($parsing_set as $table_type => $table_array) {
+            foreach ($table_array as $data) {
+                $table_name = $data[FIELD_TABLE_NAME];
+                
+                //echo "table_type: $table_type\n";
+                if ($table_type == "TEMP") {
+                    $table_name = str_replace("_temp", "", $table_name);
+                }
+                
+                $insert_table = $this->table_mapping[$table_name];
+                unset($data[FIELD_TABLE_NAME]);
+                
+                if ($table_type == "TEMP") {
+                    //echo "***** TRUNCATE \n";
+                    //先清空資料
+                    $insert_table = $insert_table."_temp";
+                    $hostname = $data[FIELD_HOSTNAME];
+                    $truncate_key = $insert_table."@~".$hostname;
+                    
+                    if (!in_array($truncate_key, $truncated_table_host)) {
+                        /*
+                         ** 同一張table只需清空一次
+                         */
+                        
+                        $delete_sql = "DELETE FROM `".$insert_table."` WHERE `hostname` = '".$hostname."';";
+                        $DAO->executeSQL($delete_sql);
+                        
+                        array_push($truncated_table_host, $truncate_key);
+                    }
+                }
+                
+                $data_array = $data;
+                $DAO->insert(strtolower($insert_table), $data_array);
+            }
         }
         
         /*
          ** 寫入 KPI 資料
          */
         foreach ($kpi_set as $data) {
-            $insert_table = $data[FIELD_TABLE_NAME];
+            $insert_table = strtolower($data[FIELD_TABLE_NAME]);
             
             unset($data[FIELD_TABLE_NAME]);
             

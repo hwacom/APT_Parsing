@@ -4,8 +4,9 @@
 			"Hwacom\\APT_Parsing\\" : "src"
 		}
 	},
-	"name" : "hwacom/APT_Parsing",
+	"name" : "Hwacom/APT_Parsing",
 	"require" : {
-		"php" : ">=7.2"
+		"php" : ">=7.2",
+		"apache/log4php" : "2.3.0"
 	}
 }

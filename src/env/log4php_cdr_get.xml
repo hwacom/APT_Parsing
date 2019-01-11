@@ -1,0 +1,19 @@
+<configuration xmlns="http://logging.apache.org/log4php/">
+    <appender name="file" class="LoggerAppenderDailyFile">
+    	<layout class="LoggerLayoutPattern">
+            <param name="conversionPattern" value="%date{T Y-M-d D H:i:s} [%class{0}] [%-5level] %msg%n" />
+        </layout>
+        <param name="file" value="/root/epdg_henbgw/log/%s/cDR_Get_%s.log" />
+        <param name="datePattern" value="Y-m-d" />
+    </appender>
+    <appender name="console" class="LoggerAppenderConsole">
+        <layout class="LoggerLayoutPattern">
+            <param name="conversionPattern" value="%date{T Y-M-d D H:i:s} [%class{0}] [%-5level] %msg%n" />
+        </layout>
+    </appender>
+    <root>
+        <level value="INFO" />
+        <appender_ref ref="file" />
+        <appender_ref ref="console" />
+    </root>
+</configuration>

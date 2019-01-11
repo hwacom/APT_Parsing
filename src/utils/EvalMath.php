@@ -1,4 +1,4 @@
-<?
+<?php
 namespace Hwacom\APT_Parsing\utils;
 
 /*
@@ -101,17 +101,29 @@ class EvalMath {
         'tan','tanh','arctan','atan','arctanh','atanh',
         'sqrt','abs','ln','log');
     
-    function EvalMath() {
+    public function __construct() {
         // make the variables a little more accurate
         $this->v['pi'] = pi();
         $this->v['e'] = exp(1);
     }
     
+    public function __destruct() {
+        
+    }
+    
+    /*
+    function EvalMath() {
+        // make the variables a little more accurate
+        $this->v['pi'] = pi();
+        $this->v['e'] = exp(1);
+    }
+    */
+    
     function e($expr) {
         return $this->evaluate($expr);
     }
     
-    function evaluate($expr) {
+    public function evaluate($expr) {
         $this->last_error = null;
         $expr = trim($expr);
         if (substr($expr, -1, 1) == ';') $expr = substr($expr, 0, strlen($expr)-1); // strip semicolons at the end

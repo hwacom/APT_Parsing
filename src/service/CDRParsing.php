@@ -2,24 +2,33 @@
 /*
  ** 針對解析完成的cDR output檔案，讀取內容 & 寫入DB
  */
-namespace Hwacom\APT_Parsing\service;
+require_once dirname(__FILE__).'/../../vendor/apache/log4php/src/main/php/Logger.php';
 
-use Hwacom\APT_Parsing\dao\DatabaseAccessObject;
-
-require_once './env/Config.inc';
+require_once dirname(__FILE__).'/../env/Config.inc';
 
 class CDRParsing
 {
+    private $logger = null;
     
     public function __construct() {
+        Logger::configure(dirname(__FILE__).'/../env/log4php_cdr_parsing.xml');
+        $this->logger = Logger::getLogger('file');
         
     }
+    
     
     public function __destruct() {
         
+        $this->logger = null;
     }
     
+    
     public function execute() {
-        
+        try {
+            
+            
+        } catch (Exception $t) {
+            
+        }
     }
 }

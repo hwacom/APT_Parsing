@@ -1,44 +1,42 @@
 <?php
-    // [資料庫連線設定] ==========================================================================================================
+    // [Database config] ==========================================================================================================
     const MYSQL_ADDRESS = "localhost";      // Host
     const MYSQL_USER_NAME = "root";         // 帳號
-    const MYSQL_PASSWORD = "root1234";      // 密碼
+    const MYSQL_PASSWORD = "changeme";      // 密碼
     const MYSQL_DB_NAME = "apt_parsing";    // 資料庫名稱
     // ======================================================================================================================
 
-    // [Parsing 檔案設定] ======================================================================================================
-    const PARSING_FILE_lOCAL_PATH = "D:/Work/Hwacom_華電/@CASE/2018.09_亞太-ePDG_Parsing/Files/source/";    // 檔案路徑
-    const PARSING_FILE_PROCESS_PATH = "D:/Work/Hwacom_華電\@CASE/2018.09_亞太-ePDG_Parsing/Files/process/";     // 處理中檔案目錄
-    const PARSING_FILE_PROCESS_SUCCESS_PATH = "D:/Work/Hwacom_華電\@CASE/2018.09_亞太-ePDG_Parsing/Files/process/success/"; // 處理成功檔案目錄
-    const PARSING_FILE_PROCESS_ERROR_PATH = "D:/Work/Hwacom_華電\@CASE/2018.09_亞太-ePDG_Parsing/Files/process/error/"; // 處理失敗檔案目錄
+    // [Parsing source file setting] ======================================================================================================
+    const PARSING_FILE_lOCAL_PATH = "/root/epdg_henbgw/csv/";    // 檔案路徑
+    const PARSING_FILE_PROCESS_PATH = "/root/epdg_henbgw/process/";     // 處理中檔案目錄
+    const PARSING_FILE_PROCESS_SUCCESS_PATH = "/root/epdg_henbgw/process/success/"; // 處理成功檔案目錄
+    const PARSING_FILE_PROCESS_ERROR_PATH = "/root/epdg_henbgw/process/error/"; // 處理失敗檔案目錄
     
     const PARSING_FILE_IGNORE_ROW_COUNT = 1;            // 設定檔案內容開頭忽略不處理的行數
-    const PARSING_HOST_NAME_SPLIT_SYMBOLS = array(      // 設定用來解析檔名取得[HOST_NAME]的固定字眼 (用此字眼切割檔名後取陣列[0]=HOST_NAME)
-        "_bulkstats"
-    );
+    const PARSING_HOST_NAME_SPLIT_SYMBOLS = "_bulkstats";      // 設定用來解析檔名取得[HOST_NAME]的固定字眼 (用此字眼切割檔名後取陣列[0]=HOST_NAME)
     const END_OF_FILE = "EndOfFile";                    // 檔案結尾字眼
-    const ABNORMAL_SYMBOLS = array (                    // 設定當欄位型態為文字，而來源檔內容如果為陣列中其一的字眼，則寫入DB的內容轉換為[ABNORMAL_SYMBOL_TRANS_TO]的值
-        "N/A"                                   
-    );
+    const ABNORMAL_SYMBOLS = "N/A";                    // 設定當欄位型態為文字，而來源檔內容如果為陣列中其一的字眼，則寫入DB的內容轉換為[ABNORMAL_SYMBOL_TRANS_TO]的值
     const ABNORMAL_SYMBOL_TRANS_TO = "";                // 接[ABNORMAL_SYMBOLS]，設定當非正常的內容要轉換為什麼字眼
     // =======================================================================================================================
     
-    // [CDR檔案取得FTP連線設定] ===================================================================================================
-    const CDR_FTP_HOST_ADDRESS = "A";
-    const CDR_FTP_USER_NAME = "B";
-    const CDR_FTP_PASSWORD = "C";
+    // [cDR file FTP config] ===================================================================================================
+    const CDR_FTP_HOST_ADDRESS = "localhost";
+    const CDR_FTP_PORT = "23";
+    const CDR_FTP_USER_NAME = "cmap";
+    const CDR_FTP_PASSWORD = "cmap1234";
+    const CDR_FTP_TIMEOUT = "5000";
     const CDR_FTP_FILE_PATH = "D";
     // =======================================================================================================================
     
-    // [系統使用TABLE名稱設定] ====================================================================================================
+    // [System usage table name setting] ====================================================================================================
     const TABLE_SYS_TABLE_MAPPING = "sys_table_mapping";
     const TABLE_SYS_SUBTRACTION_MAPPING = "sys_subtraction_setting";
-    const TABLE_SYS_KPI_FORMULA = "kpi_formula_setting";
+    const TABLE_SYS_KPI_FORMULA = "sys_kpi_formula_setting";
     const TABLE_SYS_CONFIG_SETTING = "sys_config_setting";
     const TABLE_SYS_SUMMARY_TABLE_LIST = "sys_summary_table_list";
     // =======================================================================================================================
     
-    // [系統相關參數設定] =========================================================================================================
+    // [System usage env variables setting] =========================================================================================================
     const ORDER_BY_FOR_SYS_TABLE_MAPPING = "mapping_type, table_name, order_num asc";   // 設定查找SYS_TABLE_MAPPING的排序方式
     const DEFAULT_CONDITION = "1=1";                // 預設的WHERE條件
     const DEFAULT_ORDER_BY = "1";                   // 預設的ORDER BY方式
@@ -65,6 +63,8 @@
     const FIELD_CREATE_TIME = "create_time";        // 常數定義
     const FIELD_LOCAL_TIME = "local_time";          // 常數定義
     const FIELD_FREQUENCY = "frequency";            // 常數定義
+    const FIELD_INTERVAL_BEGIN = "interval_begin";  // 常數定義
+    const FIELD_INTERVAL_END = "interval_end";      // 常數定義
     const FIELD_EPOCHTIME = "epochtime";            // 常數定義
     const FIELD_LOCALDATE = "localdate";            // 常數定義
     const FIELD_LOCALTIME = "localtime";            // 常數定義
@@ -81,5 +81,5 @@
     // =======================================================================================================================
     
     // [ePDG summary 參數設定] =========================================================================================================
-    const EPDG_SUMMARY_TIME_INTERVAL = "120";        // 設定Summary計算的時間區間(單位: 分)
+    const EPDG_SUMMARY_TIME_INTERVAL = "60";        // 設定Summary計算的時間區間(單位: 分)
     // =======================================================================================================================

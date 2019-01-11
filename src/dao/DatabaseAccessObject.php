@@ -75,8 +75,31 @@ class DatabaseAccessObject {
      */
     public function query($table = null, $condition = "1", $order_by = "1", $fields = "*", $limit = ""){
         $sql = "SELECT {$fields} FROM {$table} WHERE {$condition} ORDER BY {$order_by} {$limit}";
-        echo "SQL: $sql\n";
+        //echo "SQL: $sql\n";
         return $this->execute($sql);
+    }
+    
+    public function truncateTable($sql, $table) {
+        $stmt = mysqli_stmt_init($this->link);
+        
+        echo "truncate sql: $sql , table: $table\n";
+        if (mysqli_stmt_prepare($stmt, $sql)) {
+            mysqli_stmt_bind_param($stmt, "s", $table);
+            mysqli_stmt_execute($stmt);
+            echo "truncate execute\n";
+            mysqli_stmt_close($stmt);
+        }
+    }
+    
+    public function executeSQL($sql) {
+        $this->last_sql = $sql;
+        
+        mysqli_query($this->link, $this->last_sql);
+        
+        if (((is_object($this->link)) ? mysqli_error($this->link) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false))) {
+            $error_msg = "MySQL Update Error: " . ((is_object($this->link)) ? mysqli_error($this->link) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false));
+            throw new \Exception($error_msg);
+        }
     }
     
     public function insertBySQL($sql) {
@@ -126,6 +149,7 @@ class DatabaseAccessObject {
             $this->last_id = mysqli_insert_id($this->link);
             return $this->last_id;
         }
+        
     }
     
     /**

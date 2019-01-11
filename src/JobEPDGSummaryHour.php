@@ -1,7 +1,6 @@
 <?php
 require '../vendor/autoload.php';
-
-use Hwacom\APT_Parsing\service\EPDGSummary;
+require_once 'service/EPDGSummary.php';
 
 $summary = new EPDGSummary();
-$summary->execute();
+$summary->execute("HOUR");

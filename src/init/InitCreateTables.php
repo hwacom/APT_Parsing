@@ -12,15 +12,19 @@ $file_kpi_path = "D:/Work/Hwacom_華電/@CASE/2018.09_亞太-ePDG_Parsing/Files/init
 
 $init_obj = new LoadTemplate();
 
-//$init_obj->createKpiFormulaTable($file_kpi_path);
 
+//$init_obj->createKpiFormulaTable($file_kpi_path, "A");    //建立KPI table & KPI_FORMULA_SETTING insert
+$init_obj->createKpiFormulaTable($file_kpi_path, "T");    //建立KPI table
+//$init_obj->createKpiFormulaTable($file_kpi_path, "F");    //建立KPI_FORMULA_SETTING insert
 
 //$init_obj->createTable($file_path);
 
+/*
 $init_obj->createTable($file_path);
-$init_obj->createConstraints($file_uk_path, false);
-$init_obj->createConstraints($file_summary_uk_path, true);
-
+$init_obj->createConstraints($file_uk_path);                        // Main TABLE
+$init_obj->createConstraints($file_uk_path, "TEMP");                // Temp TABLE
+$init_obj->createConstraints($file_summary_uk_path, "SUMMARY");     // Summary TABLE
+*/
 
 //$init_obj->composeSysTableMapping($file_path);
 

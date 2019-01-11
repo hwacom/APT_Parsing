@@ -1,7 +1,6 @@
 <?php
 require '../vendor/autoload.php';
-
-use Hwacom\APT_Parsing\service\EPDGParsingAndKpi;
+require_once 'service/EPDGParsingAndKpi.php';
 
 $parsing = new EPDGParsingAndKpi();
 $parsing->execute();

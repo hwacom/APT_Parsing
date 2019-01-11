@@ -4,7 +4,7 @@ namespace Hwacom\APT_Parsing\utils;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
-require_once 'env\Config.inc';
+require_once dirname(__FILE__).'/../env/Config.inc';
 
 class FileUtils {
     
