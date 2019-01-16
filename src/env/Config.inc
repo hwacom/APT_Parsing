@@ -1,32 +1,35 @@
 <?php
-    // [Database config] ==========================================================================================================
+    // [PM Parsing Database config] ==========================================================================================================
     const MYSQL_ADDRESS = "localhost";      // Host
     const MYSQL_USER_NAME = "root";         // 帳號
     const MYSQL_PASSWORD = "changeme";      // 密碼
     const MYSQL_DB_NAME = "apt_parsing";    // 資料庫名稱
     // ======================================================================================================================
 
-    // [Parsing source file setting] ======================================================================================================
-    const PARSING_FILE_lOCAL_PATH = "/root/epdg_henbgw/csv/";    // 檔案路徑
-    const PARSING_FILE_PROCESS_PATH = "/root/epdg_henbgw/process/";     // 處理中檔案目錄
+    // [PM Parsing source file setting] ======================================================================================================
+    const PARSING_FILE_lOCAL_PATH = "/root/epdg_henbgw/csv/";                       // 檔案路徑
+    const PARSING_FILE_PROCESS_PATH = "/root/epdg_henbgw/process/";                 // 處理中檔案目錄
     const PARSING_FILE_PROCESS_SUCCESS_PATH = "/root/epdg_henbgw/process/success/"; // 處理成功檔案目錄
-    const PARSING_FILE_PROCESS_ERROR_PATH = "/root/epdg_henbgw/process/error/"; // 處理失敗檔案目錄
+    const PARSING_FILE_PROCESS_ERROR_PATH = "/root/epdg_henbgw/process/error/";     // 處理失敗檔案目錄
     
-    const PARSING_FILE_IGNORE_ROW_COUNT = 1;            // 設定檔案內容開頭忽略不處理的行數
-    const PARSING_HOST_NAME_SPLIT_SYMBOLS = "_bulkstats";      // 設定用來解析檔名取得[HOST_NAME]的固定字眼 (用此字眼切割檔名後取陣列[0]=HOST_NAME)
-    const END_OF_FILE = "EndOfFile";                    // 檔案結尾字眼
-    const ABNORMAL_SYMBOLS = "N/A";                    // 設定當欄位型態為文字，而來源檔內容如果為陣列中其一的字眼，則寫入DB的內容轉換為[ABNORMAL_SYMBOL_TRANS_TO]的值
-    const ABNORMAL_SYMBOL_TRANS_TO = "";                // 接[ABNORMAL_SYMBOLS]，設定當非正常的內容要轉換為什麼字眼
+    const PARSING_FILE_IGNORE_ROW_COUNT = 1;                    // 設定檔案內容開頭忽略不處理的行數
+    const PARSING_HOST_NAME_SPLIT_SYMBOLS = "_bulkstats";       // 設定用來解析檔名取得[HOST_NAME]的固定字眼 (用此字眼切割檔名後取陣列[0]=HOST_NAME)
+    const END_OF_FILE = "EndOfFile";                            // 檔案結尾字眼
+    const ABNORMAL_SYMBOLS = "N/A";                             // 設定當欄位型態為文字，而來源檔內容如果為陣列中其一的字眼，則寫入DB的內容轉換為[ABNORMAL_SYMBOL_TRANS_TO]的值
+    const ABNORMAL_SYMBOL_TRANS_TO = "";                        // 接[ABNORMAL_SYMBOLS]，設定當非正常的內容要轉換為什麼字眼
     // =======================================================================================================================
     
-    // [cDR file FTP config] ===================================================================================================
-    const CDR_FTP_HOST_ADDRESS = "localhost";
-    const CDR_FTP_PORT = "23";
-    const CDR_FTP_USER_NAME = "cmap";
-    const CDR_FTP_PASSWORD = "cmap1234";
-    const CDR_FTP_TIMEOUT = "5000";
-    const CDR_FTP_FILE_PATH = "D";
+    // [cDR Database config] ==========================================================================================================
+    const CDR_MYSQL_DB_NAME = "cdr_parsing";    // 資料庫名稱
+    // ======================================================================================================================
+    
+    // [cDR decode file setting] ======================================================================================================
+    const CDR_DECODE_FILE_LOCAL_PATH = "/root/epdg_cDR/decoded_cdr_tmp/";              
+    const CDR_DECODE_FILE_PROCESS_PATH = "/root/epdg_cDR/process/";
+    const CDR_DECODE_FILE_PROCESS_SUCCESS_PATH = "/root/epdg_cDR/process/success/";
+    const CDR_DECODE_FILE_PROCESS_ERROR_PATH = "/root/epdg_cDR/process/error/";
     // =======================================================================================================================
+    
     
     // [System usage table name setting] ====================================================================================================
     const TABLE_SYS_TABLE_MAPPING = "sys_table_mapping";
@@ -34,6 +37,8 @@
     const TABLE_SYS_KPI_FORMULA = "sys_kpi_formula_setting";
     const TABLE_SYS_CONFIG_SETTING = "sys_config_setting";
     const TABLE_SYS_SUMMARY_TABLE_LIST = "sys_summary_table_list";
+    
+    const TABLE_CDR_DETAIL = "cdr_detail";
     // =======================================================================================================================
     
     // [System usage env variables setting] =========================================================================================================
@@ -72,6 +77,22 @@
     const FIELD_NAME = "field_name";                // 常數定義
     const FIELD_TABLE_TYPE = "table_type";          // 常數定義
     const FIELD_AGGREGATION_TYPE = "aggregation_type";    // 常數定義
+    
+    // CDR
+    const FIELD_TAG_NAME = "tag_name";
+    const FIELD_PREFIX = "prefix";
+    const FIELD_IGNORE_FLAG = "ignore_flag";
+    const FIELD_BEGIN_INDEX = "begin_index";
+    const FIELD_END_INDEX = "end_index";
+    const FIELD_BEGIN_SYMBOL = "begin_symbol";
+    const FIELD_END_SYMBOL = "end_symbol";
+    const FIELD_TARGET_TABLE_NAME = "target_table_name";
+    const FIELD_TARGET_TABLE_FIELD = "target_table_field";
+    const FIELD_FILE_NAME = "file_name";
+    
+    const PARSING_FINISH_LINE = "parsing finished";
+    
+    const TAG_NAME_CDR = "CDR";
     
     const MAPPING_TYPE_TABLE = "TABLE";             // 常數定義
     const MAPPING_TYPE_FIELD = "FIELD";             // 常數定義

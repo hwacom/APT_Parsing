@@ -52,7 +52,7 @@ class CDRGetFile
             echo "conn_id: $conn_id\n";
             
             // login with username and password
-            $login_result = ftp_login($conn_id, $this->ftp_ip->ftp_login_account, $this->ftp_login_password);
+            $login_result = ftp_login($conn_id, $this->ftp_login_account, $this->ftp_login_password);
             echo "login_result: $login_result\n";
             
             // check connection
@@ -64,6 +64,8 @@ class CDRGetFile
             } else {
                 echo "Connected to $this->ftp_ip, for user $this->ftp_login_account";
             }
+            
+            $change_dir = ftp_chdir($conn_id, $this->ftp_cdr_file_dir);
             
         } catch (Exception $t) {
             

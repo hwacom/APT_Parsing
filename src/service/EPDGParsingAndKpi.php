@@ -184,7 +184,7 @@ class EPDGParsingAndKpi
                     rename($path, $new_path);
                     
                 } catch (Exception $t) {
-                    $this->logger->info( "Caught exception:  ".$t->getMessage() );
+                    $this->logger->error( "Caught exception:  ".$t->getMessage() );
                     
                     /*
                      ** 處理失敗則將檔案移至ERROR資料夾
@@ -211,7 +211,7 @@ class EPDGParsingAndKpi
             $this->logger->info( "============================================================================================================================================" );
             
         } catch (Exception $t) {
-            $this->logger->info( "Caught exception:  ".$t->getMessage() );
+            $this->logger->error( "Caught exception:  ".$t->getMessage() );
             
         } //finally {
             /*

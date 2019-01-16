@@ -181,14 +181,14 @@ class EPDGSummary
                         $this->calculateSummary($DAO, $table_name, $table_type, $round);
                         
                     } catch (Exception $t) {
-                        $this->logger->info( "Caught exception:  ".$t->getMessage() );
+                        $this->logger->error( "Caught exception:  ".$t->getMessage() );
                     }
                     $round++;
                 }
             }
             
         } catch (Exception $t) {
-            $this->logger->info( "Caught exception:  ".$t->getMessage() );
+            $this->logger->error( "Caught exception:  ".$t->getMessage() );
             
         }
     }

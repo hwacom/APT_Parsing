@@ -1,6 +1,8 @@
 <?php
 namespace Hwacom\APT_Parsing\dao;
 
+use Exception;
+
 class DatabaseAccessObject {
     private $mysql_address = "";
     private $mysql_username = "";
@@ -128,10 +130,21 @@ class DatabaseAccessObject {
         $tmp_dat = array();
         
         foreach ($data_array as $key => $value) {
-            $value = mysqli_real_escape_string($this->link, $value);
+            try {
+                $value = mysqli_real_escape_string($this->link, $value);
+                
+            } catch (Exception $e) {
+                $this->logger->error( "Caught exception:  ".$t->getMessage() );
+            }
+            
+            //$value = htmlspecialchars($value, ENT_QUOTES, "ISO-8859-1");
+            //$value = filter_var($value, FILTER_SANITIZE_STRING);
+            //$value = $this->link->real_escape_string($value);
+            
             $tmp_col[] = '`'.$key.'`';
             $tmp_dat[] = "'$value'";
         }
+        
         $columns = join(",", $tmp_col);
         $data = join(",", $tmp_dat);
         
