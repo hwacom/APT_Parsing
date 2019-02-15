@@ -529,7 +529,7 @@ class EPDGParsingAndKpi
                              ** 欄位名稱若不存在於 Template 欄位範圍內則跳過 (公式期初設定應已排除掉不存在的項目)
                              ** 僅處理: card / port / system / epdg / henbgw-access / henbgw-network / diameter-auth / egtpc
                              */
-                            $this->logger->info( "***** Variable not found excepton >> variable: $map_key " );
+                            //$this->logger->info( "***** Variable not found excepton >> variable: $map_key " );
                             continue;
                             
                         } else {
