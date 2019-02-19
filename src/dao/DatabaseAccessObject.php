@@ -134,7 +134,7 @@ class DatabaseAccessObject {
                 $value = mysqli_real_escape_string($this->link, $value);
                 
             } catch (Exception $e) {
-                $this->logger->error( "Caught exception:  ".$t->getMessage() );
+                $this->logger->error( "Caught exception:  ".$e->getMessage() );
             }
             
             //$value = htmlspecialchars($value, ENT_QUOTES, "ISO-8859-1");

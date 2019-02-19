@@ -152,6 +152,8 @@ class EPDGParsingAndKpi
             $idx = 0;
             foreach ($file_paths as $path) {
                 $idx++;
+                
+                //TODO Linux:/ Windows:\\
                 $tmp_arr = explode("/", $path);
                 $filename = $tmp_arr[count($tmp_arr) - 1];
                 
@@ -163,18 +165,26 @@ class EPDGParsingAndKpi
                      */
                     $this->logger->info( "Step 3-1. 進行parsing作業" );
                     $parsing_set = $this->doParsing($path);
+                    //print_r($parsing_set);
                     
                     /*
                      * Step 3-2. 進行KPI計算
                      */
                     $this->logger->info( "Step 3-2. 進行KPI計算" );
                     $kpi_set = $this->doKpiCalculate();
+                    //print_r($kpi_set);
                     
                     /*
                      * Step 3-3. 將parsing & KPI結果寫入DB
                      */
                     $this->logger->info( "Step 3-3. 將parsing & KPI結果寫入DB" );
                     $this->insertData2DB($DAO, $parsing_set, $kpi_set);
+                    
+                    /*
+                     * Step 3-4. 輸出XML檔案
+                     */
+                    $this->logger->info( "Step 3-4. 輸出XML檔案" );
+                    $this->outputXML($parsing_set, $kpi_set);
                     
                     /*
                      ** 處理成功則將檔案移至SUCCESS資料夾
@@ -331,6 +341,7 @@ class EPDGParsingAndKpi
         $dataset = array();
         
         // 分析檔名取出 [HOST_NAME] ============================================================================
+        //TODO Linux:/ Windows:\\
         $path_slice = explode("/", $path);
         $file_name = $path_slice[count($path_slice)-1];
         
@@ -546,12 +557,13 @@ class EPDGParsingAndKpi
                     // 再次檢核替換數值後的公式內容是否還含有% (用來包夾欄位所使用的符號)
                     $match = preg_match("/%/", $formula);
                     
+                    //echo "formula: $formula, match: $match\r\n";
                     if ($match == 0) {
                         // 呼叫API進行公式計算
                         $kpi_value = $eval_math->evaluate($formula);
+                        
+                        $data[$kpi_name] = $kpi_value;
                     }
-                    
-                    $data[$kpi_name] = $kpi_value;
                 }
             }
             
@@ -626,6 +638,121 @@ class EPDGParsingAndKpi
             
             $data_array = $data;
             $DAO->insert($insert_table, $data_array);
+        }
+    }
+    
+    /**
+     * *將parsing結果輸出成XML
+     * @param array $parsing_set
+     * @param array $kpi_set
+     */
+    private function outputXML($parsing_set = array(), $kpi_set = array()) {
+        foreach ($parsing_set as $table_type => $table_array) {
+            foreach ($table_array as $data) {
+                $doc = new DOMDocument();
+                $doc->formatOutput = true;
+                
+                $save_folder = OUTPUT_XML_FILE_PATH;
+                $save_path = OUTPUT_XML_FILE_PATH;
+                
+                $type = trim($data[FIELD_TYPE]);
+                $host_name = trim($data[FIELD_HOST_NAME]);
+                $table_name = trim($data[FIELD_TABLE_NAME]);
+                
+                if (strpos($table_name, "_temp")) {
+                    // temp TABLE跳過
+                    continue;
+                }
+                
+                if ($type == "henbgw-access") {
+                    //路徑 = HOST_NAME / type / VPN_NAME / TABLE_NAME.xml
+                    
+                    $vpn_name = trim($data[FIELD_VPN_NAME]);
+                    
+                    $save_folder = $save_path . $host_name . "/" . $type . "/" . $vpn_name;
+                    $save_path = $save_path . $host_name . "/" . $type . "/" . $vpn_name . "/" . $table_name . ".xml";
+                    
+                } else if ($type == "henbgw-network") {
+                    //路徑 = HOST_NAME / type / TABLE_NAME.xml
+                    
+                    $save_folder = $save_path . $host_name . "/" . $type;
+                    $save_path = $save_path . $host_name . "/" . $type . "/" . $table_name . ".xml";
+                    
+                } else if ($type == "card" || $type == "port") {
+                    //路徑 = HOST_NAME<EPDG> / Card / Card 1~6 / TABLE_NAME.xml
+                    
+                    $card = trim($data[FIELD_CARD]);
+                    
+                    $save_folder = $save_path . $host_name . "/Card/Card " . $card;
+                    $save_path = $save_path . $host_name . "/Card/Card " . $card . "/" . $table_name . ".xml";
+                    
+                } else if ($type == "egtpc" || $type == "epdg" || $type == "system") {
+                    //路徑 = HOST_NAME<EPDG> / [ePDG or egtpc or system] / TABLE_NAME.xml
+                    
+                    $save_folder = $save_path . $host_name . "/" . $type;
+                    $save_path = $save_path . $host_name . "/" . $type . "/" . $table_name . ".xml";
+                    
+                } else if ($type == "diameter-auth") {
+                    //路徑 = HOST_NAME<EPDG> / Diameter / ipaddr / TABLE_NAME.xml
+                    
+                    $ipaddr = trim($data[FIELD_IPADDR]);
+                    
+                    $save_folder = $save_path . $host_name . "/" . $type . "/" . $ipaddr;
+                    $save_path = $save_path . $host_name . "/" . $type . "/" . $ipaddr . "/" . $table_name . ".xml";
+                }
+                
+                unset($data[FIELD_TABLE_NAME]);
+                
+                unset($data[FIELD_HOST_NAME]);
+                unset($data[FIELD_TYPE]);
+                unset($data[FIELD_SUB_TYPE]);
+                unset($data[FIELD_EPOCHTIME]);
+                unset($data[FIELD_LOCALDATE]);
+                unset($data[FIELD_LOCALTIME]);
+                unset($data[FIELD_UPTIME]);
+                if (!empty($data[FIELD_VPN_NAME])) {
+                    unset($data[FIELD_VPN_NAME]);
+                }
+                if (!empty($data[FIELD_VPN_ID])) {
+                    unset($data[FIELD_VPN_ID]);
+                }
+                if (!empty($data[FIELD_SERV_NAME])) {
+                    unset($data[FIELD_SERV_NAME]);
+                }
+                if (!empty($data[FIELD_SERV_ID])) {
+                    unset($data[FIELD_SERV_ID]);
+                }
+                
+                $node_prtg = $doc->createElement( "prtg" );
+                $doc->appendChild( $node_prtg );
+                
+                foreach ($data as $key => $value) {
+                    $node_result = $doc->createElement( "result" );
+                    $node_prtg->appendChild( $node_result );
+                    
+                    $node_channel = $doc->createElement( "channel" );
+                    $node_channel->appendChild(
+                        $doc->createTextNode( $key )
+                    );
+                    
+                    $node_value = $doc->createElement( "value" );
+                    $node_value->appendChild(
+                        $doc->createTextNode( $value )
+                    );
+                    
+                    $node_result->appendChild( $node_channel );
+                    $node_result->appendChild( $node_value );
+                }
+                
+                //echo $doc->saveXML();
+                //echo ">>>>> save_folder : $save_folder\n";
+                if (!is_dir($save_folder)) {
+                    // dir doesn't exist, make it
+                    mkdir($save_folder, 0777, true);
+                }
+                
+                file_put_contents($save_path, $doc->saveXML());
+            }
         }
     }
 }

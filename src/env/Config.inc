@@ -5,12 +5,22 @@
     const MYSQL_PASSWORD = "changeme";      // 密碼
     const MYSQL_DB_NAME = "apt_parsing";    // 資料庫名稱
     // ======================================================================================================================
+    
+    // [Parsing result XML file storage path] ================================================================================================
+    const OUTPUT_XML_FILE_PATH = "/var/www/html/xml/";
 
     // [PM Parsing source file setting] ======================================================================================================
     const PARSING_FILE_lOCAL_PATH = "/root/epdg_henbgw/csv/";                       // 檔案路徑
     const PARSING_FILE_PROCESS_PATH = "/root/epdg_henbgw/process/";                 // 處理中檔案目錄
     const PARSING_FILE_PROCESS_SUCCESS_PATH = "/root/epdg_henbgw/process/success/"; // 處理成功檔案目錄
     const PARSING_FILE_PROCESS_ERROR_PATH = "/root/epdg_henbgw/process/error/";     // 處理失敗檔案目錄
+    
+    /*
+    const PARSING_FILE_lOCAL_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\source\\";                       // 檔案路徑
+    const PARSING_FILE_PROCESS_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\process\\";                 // 處理中檔案目錄
+    const PARSING_FILE_PROCESS_SUCCESS_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\process\\success\\"; // 處理成功檔案目錄
+    const PARSING_FILE_PROCESS_ERROR_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\process\\error\\";     // 處理失敗檔案目錄
+    */
     
     const PARSING_FILE_IGNORE_ROW_COUNT = 1;                    // 設定檔案內容開頭忽略不處理的行數
     const PARSING_HOST_NAME_SPLIT_SYMBOLS = "_bulkstats";       // 設定用來解析檔名取得[HOST_NAME]的固定字眼 (用此字眼切割檔名後取陣列[0]=HOST_NAME)
@@ -55,6 +65,10 @@
     const FIELD_ORDER_NUM = "order_num";            // 常數定義
     const FIELD_DATA_TYPE = "data_type";            // 常數定義
     const FIELD_HOST_NAME = "hostname";             // 常數定義
+    const FIELD_VPN_NAME = "vpnname";               // 常數定義
+    const FIELD_VPN_ID = "vpnid";                   // 常數定義
+    const FIELD_SERV_NAME = "servname";             // 常數定義
+    const FIELD_SERV_ID = "servid";                 // 常數定義
     const FIELD_MAPPING_TYPE = "mapping_type";      // 常數定義
     const FIELD_CATELOG = "catelog";                // 常數定義
     const FIELD_KPI_NAME = "kpi_name";              // 常數定義
@@ -64,6 +78,8 @@
     const FIELD_HOSTNAME = "hostname";              // 常數定義
     const FIELD_TYPE = "type";                      // 常數定義
     const FIELD_SUB_TYPE = "sub_type";              // 常數定義
+    const FIELD_CARD = "card";                      // 常數定義
+    const FIELD_IPADDR = "ipaddr";                  // 常數定義
     const FIELD_CREATE_DATE = "create_date";        // 常數定義
     const FIELD_CREATE_TIME = "create_time";        // 常數定義
     const FIELD_LOCAL_TIME = "local_time";          // 常數定義
