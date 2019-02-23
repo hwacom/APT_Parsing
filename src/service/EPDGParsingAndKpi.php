@@ -454,8 +454,9 @@ class EPDGParsingAndKpi
                                         //echo "table_name: $db_table_name , field_name: $field_name , field_value: $field_value , last_value: $last_value \n";
                                         $field_value -= $last_value;
                                         
-                                        if ($field_var == "mcast_inpackets") {
-                                            echo "******** fianl -- field_value: $field_value\n";
+                                        if ($field_value < 0) {
+                                            // Y190223, 設備可能因為重啟後數值初始化，導致計算時會得到負值，此種情況下就寫入當下CSV內的數值
+                                            $field_value = $fields[$idx];
                                         }
                                     }
                                 }
