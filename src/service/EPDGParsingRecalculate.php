@@ -9,7 +9,7 @@ use Hwacom\APT_Parsing\utils\FileUtils;
 use Hwacom\APT_Parsing\utils\EvalMath;
 use Hwacom\APT_Parsing\utils\GuidUtils;
 
-class EPDGParsingAndKpi
+class EPDGParsingRecalculate
 {
     private $logger = null;
     
@@ -32,10 +32,11 @@ class EPDGParsingAndKpi
     private $end_time = null;
     
     private $batch_no = null;
-    private $today_yyyyMMdd = null;
+    private $begin_date_time = null;
+    private $end_date_time = null;
     
     public function __construct() {
-        Logger::configure(dirname(__FILE__).'/../env/log4php_parsing.xml');
+        Logger::configure(dirname(__FILE__).'/../env/log4php_epdg_recalculate.xml');
         $this->logger = Logger::getLogger('file');
         
         $guid_utils = new GuidUtils();
@@ -60,8 +61,6 @@ class EPDGParsingAndKpi
         $this->c_localdate = null;
         $this->c_localtime = null;
         $this->c_uptime = null;
-        
-        $this->today_yyyyMMdd = date("Y-m-d");
     }
     
     public function __destruct() {
@@ -78,7 +77,6 @@ class EPDGParsingAndKpi
         unset($GLOBALS['c_localdate']);
         unset($GLOBALS['c_localtime']);
         unset($GLOBALS['c_uptime']);
-        unset($GLOBALS['today_yyyyMMdd']);
         
         $this->end_time = time();
         $spent_time = $this->end_time - $this->start_time;
@@ -88,15 +86,20 @@ class EPDGParsingAndKpi
         
         $this->logger = null;
     }
-      
-    public function execute() {
+    
+    public function execute($begin_time, $end_time) {
         try {
+            $this->begin_date_time = date_create_from_format("Y-m-d H:i", $begin_time);
+            $this->end_date_time = date_create_from_format("Y-m-d H:i", $end_time);
+            echo "begin_time: $begin_time , end_time: $end_time " . PHP_EOL;
+            print "begin_date_time: " . $this->begin_date_time->format('Y-m-d H:i:s') . ", end_date_time: " . $this->end_date_time->format('Y-m-d H:i:s') . PHP_EOL;
+            
             /*
-             * Step 1. 判斷 & 取得要parsing的檔案
+             * Step 1. 判斷輸入的日期區間，取得需要重算的檔案
              */
-            $this->logger->info( "Step 1. 判斷 & 取得要parsing的檔案" );
+            $this->logger->info( "Step 1. 判斷輸入的日期區間，取得需要重算的檔案" );
             $file_utils = new FileUtils();
-            $file_paths = $file_utils->getLocalFile();
+            $file_paths = $file_utils->getLocalFileBySpecifyInterval($this->begin_date_time, $this->end_date_time);
             
             if (empty($file_paths)) {
                 throw new Exception("No files need to parsing.");
@@ -191,19 +194,10 @@ class EPDGParsingAndKpi
                     $this->insertData2DB($DAO, $parsing_set, $kpi_set);
                     
                     /*
-                     * Step 3-4. 輸出XML檔案
-                     */
-                    $this->logger->info( "Step 3-4. 輸出XML檔案" );
-                    $this->outputXML($parsing_set, $kpi_set);
-                    
-                    /*
                      ** 處理成功則將檔案移至SUCCESS資料夾
                      */
                     $this->logger->info( "Step 3-4. 將檔案移動至 success 資料夾" );
-                    $today_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . "/" . $this->today_yyyyMMdd . "/";
-                    $file_utils->checkIfDirExistsOrCreate($today_dir);
-                    
-                    $new_path = $today_dir . $filename;
+                    $new_path = PARSING_FILE_PROCESS_SUCCESS_PATH . $filename;
                     rename($path, $new_path);
                     
                 } catch (Exception $t) {
@@ -213,24 +207,21 @@ class EPDGParsingAndKpi
                      ** 處理失敗則將檔案移至ERROR資料夾
                      */
                     $this->logger->info( "Step 3-4. 將檔案移動至 error 資料夾" );
-                    $today_dir = PARSING_FILE_PROCESS_ERROR_PATH . "/" . $this->today_yyyyMMdd . "/";
-                    $file_utils->checkIfDirExistsOrCreate($today_dir);
-                    
-                    $new_path = $today_dir . $filename;
+                    $new_path = PARSING_FILE_PROCESS_ERROR_PATH . $filename;
                     rename($path, $new_path);
                     continue;
                     
-                }// finally { 
-                    /*
-                     * Step 3-4. 初始化全域變數，處理下一個檔案
-                     */
-                    $this->logger->info( "Step 3-4. 初始化全域變數" );
-                    unset($GLOBALS['value_map']);
-                    unset($GLOBALS['c_hostname']);
-                    unset($GLOBALS['c_epochtime']);
-                    unset($GLOBALS['c_localdate']);
-                    unset($GLOBALS['c_localtime']);
-                    unset($GLOBALS['c_uptime']);
+                }// finally {
+                /*
+                 * Step 3-4. 初始化全域變數，處理下一個檔案
+                 */
+                $this->logger->info( "Step 3-4. 初始化全域變數" );
+                unset($GLOBALS['value_map']);
+                unset($GLOBALS['c_hostname']);
+                unset($GLOBALS['c_epochtime']);
+                unset($GLOBALS['c_localdate']);
+                unset($GLOBALS['c_localtime']);
+                unset($GLOBALS['c_uptime']);
                 //}
             }
             
@@ -240,10 +231,10 @@ class EPDGParsingAndKpi
             $this->logger->error( "Caught exception:  ".$t->getMessage() );
             
         } //finally {
-            /*
-             * Step 4. 執行完成，釋放資源
-             */
-            $this->logger->info( "Step 4. 執行完成，釋放資源" );
+        /*
+         * Step 4. 執行完成，釋放資源
+         */
+        $this->logger->info( "Step 4. 執行完成，釋放資源" );
         //}
     }
     
@@ -368,14 +359,14 @@ class EPDGParsingAndKpi
             $hostname = $tmp[0];
         }
         /* php 5.3.3 不支援 const ARRAY
-        foreach (PARSING_HOST_NAME_SPLIT_SYMBOLS as $symbol) {
-            if (strpos($file_name, $symbol)) {
-                $tmp = explode($symbol, $file_name);
-                $hostname = $tmp[0];
-                break;
-            }
-        }
-        */
+         foreach (PARSING_HOST_NAME_SPLIT_SYMBOLS as $symbol) {
+         if (strpos($file_name, $symbol)) {
+         $tmp = explode($symbol, $file_name);
+         $hostname = $tmp[0];
+         break;
+         }
+         }
+         */
         // =================================================================================================
         
         // 迴圈讀取檔案內容 ======================================================================================
@@ -410,36 +401,11 @@ class EPDGParsingAndKpi
                     $this->c_uptime = $fields[6];
                     
                     /*
-                     ** 查找當前處理的資料類型的前一筆資料
-                     ** 以此類型的TABLE UK欄位查找
+                     ** 重算時不將資料寫入temp資料夾
+                     ** 直接透過前面步驟取出的區間內檔案做處理
                      */
-                    $DAO = new DatabaseAccessObject(MYSQL_ADDRESS, MYSQL_USER_NAME, MYSQL_PASSWORD, MYSQL_DB_NAME);
-                    $temp_table_name = $this->table_mapping[$table_name]."_temp";
-                    
-                    $uk_field = $this->table_uk_mapping[$table_name];
-                    
-                    if (!empty($uk_field)) {
-                        $default_condition = " 1=1 ";
-                        $condition = $default_condition;
-                        for ($idx = 0; $idx < count($fields); $idx++) {
-                            if (array_key_exists($table_name, $this->field_mapping)) {
-                                $table_field_array = $this->field_mapping[$table_name];
-                                
-                                if (!empty($table_field_array[$idx])) {
-                                    $field_name = $table_field_array[$idx];
-                                    $field_value = ($field_name == FIELD_HOSTNAME) ? $hostname : $fields[$idx];
-                                    
-                                    if (in_array($field_name, $uk_field)) {
-                                        $condition = $condition." AND `".$field_name."` = '".$field_value."' ";
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if ($condition != $default_condition) {
-                            $last_record_set = $DAO->query($temp_table_name, $condition, "`epochtime` DESC", QUERY_ALL, LIMIT_1_ROW);
-                        }
-                    }
+                    //TODO
+                    $last_record_set = null;
                     
                     for ($idx = 0; $idx < count($fields); $idx++) {
                         if (array_key_exists($table_name, $this->field_mapping)) {
@@ -517,13 +483,13 @@ class EPDGParsingAndKpi
                 $content = ABNORMAL_SYMBOL_TRANS_TO;
             }
             /* php 5.3.3 不支援 const ARRAY
-            foreach (ABNORMAL_SYMBOLS as $symbol) {
-                if ($content === $symbol) {
-                    $content = ABNORMAL_SYMBOL_TRANS_TO;
-                    break;
-                }
-            }
-            */
+             foreach (ABNORMAL_SYMBOLS as $symbol) {
+             if ($content === $symbol) {
+             $content = ABNORMAL_SYMBOL_TRANS_TO;
+             break;
+             }
+             }
+             */
         }
         
         return $content;
@@ -605,40 +571,15 @@ class EPDGParsingAndKpi
      */
     private function insertData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
         /*
-         ** 寫入 Parsing 資料
+         ** 更新/新增 Parsing 資料
          */
-        $truncated_table_host = array();
-        
+        //TODO
         foreach ($parsing_set as $table_type => $table_array) {
             foreach ($table_array as $data) {
                 $table_name = $data[FIELD_TABLE_NAME];
                 
-                //echo "table_type: $table_type\n";
-                if ($table_type == "TEMP") {
-                    $table_name = str_replace("_temp", "", $table_name);
-                }
-                
                 $insert_table = $this->table_mapping[$table_name];
                 unset($data[FIELD_TABLE_NAME]);
-                
-                if ($table_type == "TEMP") {
-                    //echo "***** TRUNCATE \n";
-                    //先清空資料
-                    $insert_table = $insert_table."_temp";
-                    $hostname = $data[FIELD_HOSTNAME];
-                    $truncate_key = $insert_table."@~".$hostname;
-                    
-                    if (!in_array($truncate_key, $truncated_table_host)) {
-                        /*
-                         ** 同一張table只需清空一次
-                         */
-                        
-                        $delete_sql = "DELETE FROM `".$insert_table."` WHERE `hostname` = '".$hostname."';";
-                        $DAO->executeSQL($delete_sql);
-                        
-                        array_push($truncated_table_host, $truncate_key);
-                    }
-                }
                 
                 $data_array = $data;
                 $DAO->insert(strtolower($insert_table), $data_array);
@@ -646,8 +587,9 @@ class EPDGParsingAndKpi
         }
         
         /*
-         ** 寫入 KPI 資料
+         ** 更新/新增 KPI 資料
          */
+        //TODO
         foreach ($kpi_set as $data) {
             $insert_table = strtolower($data[FIELD_TABLE_NAME]);
             
@@ -655,121 +597,6 @@ class EPDGParsingAndKpi
             
             $data_array = $data;
             $DAO->insert($insert_table, $data_array);
-        }
-    }
-    
-    /**
-     * *將parsing結果輸出成XML
-     * @param array $parsing_set
-     * @param array $kpi_set
-     */
-    private function outputXML($parsing_set = array(), $kpi_set = array()) {
-        foreach ($parsing_set as $table_type => $table_array) {
-            foreach ($table_array as $data) {
-                $doc = new DOMDocument();
-                $doc->formatOutput = true;
-                
-                $save_folder = OUTPUT_XML_FILE_PATH;
-                $save_path = OUTPUT_XML_FILE_PATH;
-                
-                $type = trim($data[FIELD_TYPE]);
-                $host_name = trim($data[FIELD_HOST_NAME]);
-                $table_name = trim($data[FIELD_TABLE_NAME]);
-                
-                if (strpos($table_name, "_temp")) {
-                    // temp TABLE跳過
-                    continue;
-                }
-                
-                if ($type == "henbgw-access") {
-                    //路徑 = HOST_NAME / type / VPN_NAME / TABLE_NAME.xml
-                    
-                    $vpn_name = trim($data[FIELD_VPN_NAME]);
-                    
-                    $save_folder = $save_path . $host_name . "/" . $type . "/" . $vpn_name;
-                    $save_path = $save_path . $host_name . "/" . $type . "/" . $vpn_name . "/" . $table_name . ".xml";
-                    
-                } else if ($type == "henbgw-network") {
-                    //路徑 = HOST_NAME / type / TABLE_NAME.xml
-                    
-                    $save_folder = $save_path . $host_name . "/" . $type;
-                    $save_path = $save_path . $host_name . "/" . $type . "/" . $table_name . ".xml";
-                    
-                } else if ($type == "card" || $type == "port") {
-                    //路徑 = HOST_NAME<EPDG> / Card / Card 1~6 / TABLE_NAME.xml
-                    
-                    $card = trim($data[FIELD_CARD]);
-                    
-                    $save_folder = $save_path . $host_name . "/Card/Card " . $card;
-                    $save_path = $save_path . $host_name . "/Card/Card " . $card . "/" . $table_name . ".xml";
-                    
-                } else if ($type == "egtpc" || $type == "epdg" || $type == "system") {
-                    //路徑 = HOST_NAME<EPDG> / [ePDG or egtpc or system] / TABLE_NAME.xml
-                    
-                    $save_folder = $save_path . $host_name . "/" . $type;
-                    $save_path = $save_path . $host_name . "/" . $type . "/" . $table_name . ".xml";
-                    
-                } else if ($type == "diameter-auth") {
-                    //路徑 = HOST_NAME<EPDG> / Diameter / ipaddr / TABLE_NAME.xml
-                    
-                    $ipaddr = trim($data[FIELD_IPADDR]);
-                    
-                    $save_folder = $save_path . $host_name . "/" . $type . "/" . $ipaddr;
-                    $save_path = $save_path . $host_name . "/" . $type . "/" . $ipaddr . "/" . $table_name . ".xml";
-                }
-                
-                unset($data[FIELD_TABLE_NAME]);
-                
-                unset($data[FIELD_HOST_NAME]);
-                unset($data[FIELD_TYPE]);
-                unset($data[FIELD_SUB_TYPE]);
-                unset($data[FIELD_EPOCHTIME]);
-                unset($data[FIELD_LOCALDATE]);
-                unset($data[FIELD_LOCALTIME]);
-                unset($data[FIELD_UPTIME]);
-                if (!empty($data[FIELD_VPN_NAME])) {
-                    unset($data[FIELD_VPN_NAME]);
-                }
-                if (!empty($data[FIELD_VPN_ID])) {
-                    unset($data[FIELD_VPN_ID]);
-                }
-                if (!empty($data[FIELD_SERV_NAME])) {
-                    unset($data[FIELD_SERV_NAME]);
-                }
-                if (!empty($data[FIELD_SERV_ID])) {
-                    unset($data[FIELD_SERV_ID]);
-                }
-                
-                $node_prtg = $doc->createElement( "prtg" );
-                $doc->appendChild( $node_prtg );
-                
-                foreach ($data as $key => $value) {
-                    $node_result = $doc->createElement( "result" );
-                    $node_prtg->appendChild( $node_result );
-                    
-                    $node_channel = $doc->createElement( "channel" );
-                    $node_channel->appendChild(
-                        $doc->createTextNode( $key )
-                    );
-                    
-                    $node_value = $doc->createElement( "value" );
-                    $node_value->appendChild(
-                        $doc->createTextNode( $value )
-                    );
-                    
-                    $node_result->appendChild( $node_channel );
-                    $node_result->appendChild( $node_value );
-                }
-                
-                //echo $doc->saveXML();
-                //echo ">>>>> save_folder : $save_folder\n";
-                if (!is_dir($save_folder)) {
-                    // dir doesn't exist, make it
-                    mkdir($save_folder, 0777, true);
-                }
-                
-                file_put_contents($save_path, $doc->saveXML());
-            }
         }
     }
 }

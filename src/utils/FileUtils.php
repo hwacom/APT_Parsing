@@ -1,6 +1,8 @@
 <?php
 namespace Hwacom\APT_Parsing\utils;
 
+use RecursiveFilterIterator;
+use RecursiveIterator;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
@@ -16,6 +18,90 @@ class FileUtils {
         
     }
     
+    /**
+     **判斷資料夾路徑是否存在，不存在則建立
+     * @param $dir_path
+     */
+    public function checkIfDirExistsOrCreate($dir_path) {
+        if (!file_exists($dir_path) && !is_dir($dir_path)) {
+            mkdir($dir_path, 0777, true);
+        }
+    }
+    
+    /**
+     ** 取出符合日期範圍內的檔案路徑，放至Array內回傳
+     * @param $files_array
+     * @param $dir_path
+     * @param $begin_date_time
+     * @param $end_date_time
+     * @return
+     */
+    public function chkMatchedFiles($files_array, $dir_path, $begin_date_time, $end_date_time) {
+        //判斷資料夾是否存在 OR 創建
+        $this->checkIfDirExistsOrCreate($dir_path);
+        
+        $directory = new RecursiveDirectoryIterator($dir_path);
+        $filter = new FilesystemDateFilter($directory, $begin_date_time->getTimestamp(), $end_date_time->getTimestamp());
+        
+        foreach(new RecursiveIteratorIterator($filter) as $filename) {
+            $path = $dir_path . $filename;
+            array_push($files_array, $path);
+        }
+        
+        return $files_array;
+    }
+    
+    /**
+     **取得HeNBGW備份目錄下，符合日期區間內的所有檔案
+     * @param $begin_time
+     * @param $end_time
+     */
+    public function getLocalFileBySpecifyInterval($begin_date_time, $end_date_time) {
+        $files = array();
+        
+        $begin_date_str = $begin_date_time->format("Y-m-d");
+        $begin_time_str = $begin_date_time->format("H:i");
+        
+        if ($begin_time_str === "00:00") {
+            //如果輸入的起始時間為「00:00」，則須往前推一天取得前一天最後一份檔案「23:55」
+            $pre_date_time = date_create_from_format("Y-m-d H:i", $begin_date_str." 23:55");
+            $pre_end_date_time = date_create_from_format("Y-m-d H:i", $begin_date_str." 00:00");
+            date_sub($pre_date_time, date_interval_create_from_date_string('1 days'));
+            
+            $pre_date_str = $pre_date_time->format("Y-m-d");
+            
+            //先看SUCCESS資料夾
+            $pre_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . "/" . $pre_date_str . "/";
+            echo "先看SUCCESS資料夾 >> $pre_date_dir".PHP_EOL;
+            $files = $this->chkMatchedFiles($files, $pre_date_dir, $pre_date_time, $pre_end_date_time);
+            
+            //再看ERROR資料夾
+            $pre_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . "/" . $pre_date_str . "/";
+            echo "先看ERROR資料夾 >> $pre_date_dir".PHP_EOL;
+            $files = $this->chkMatchedFiles($files, $pre_date_dir, $pre_date_time, $pre_end_date_time);
+            
+            $begin_date_time = date_create_from_format("Y-m-d H:i", $begin_date_str." 00:00");
+        }
+        
+        //先看SUCCESS資料夾
+        $begin_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . "/" . $begin_date_str . "/";
+        echo "先看SUCCESS資料夾 >> $begin_date_dir".PHP_EOL;
+        $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
+        
+        //再看ERROR資料夾
+        $begin_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . "/" . $begin_date_str . "/";
+        echo "先看ERROR資料夾 >> $begin_date_dir".PHP_EOL;
+        $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
+        
+        sort($files);   //由小到大排序
+        print_r($files);
+        return $files;
+    }
+    
+    /**
+     **取得HeNBGW目錄下所有檔案
+     * @return array
+     */
     public function getLocalFile() {
         $files = array();
         $tmp_files = array();
@@ -49,6 +135,10 @@ class FileUtils {
         return $files;
     }
     
+    /**
+     **取得cDR目錄下所有檔案
+     * @return array
+     */
     public function getLocalCDRFile() {
         $files = array();
         $tmp_files = array();
@@ -83,3 +173,31 @@ class FileUtils {
         return $files;
     }
 }
+
+class FilesystemDateFilter extends RecursiveFilterIterator
+{
+    protected $earliest_date;
+    protected $lastest_date;
+    
+    public function __construct(RecursiveIterator $it, $earliest_date, $lastest_date)
+    {
+        $this->earliest_date = $earliest_date;
+        $this->lastest_date = $lastest_date;
+        parent::__construct($it);
+    }
+    
+    public function accept()
+    {
+        /*
+        echo "fileName: ".$this->getFilename().", MTime: ".$this->getMTime().", earliest_date: ".$this->earliest_date.", lastest_date: ".$this->lastest_date.PHP_EOL;
+        echo ">>> ifFile: ".$this->isFile().", MTime >= earliest_date: ".($this->getMTime() >= $this->earliest_date).", MTime < lastest_date: ".($this->getMTime() < $this->lastest_date).PHP_EOL;
+        echo ">>>>>> return: ".(! $this->isFile() || ( $this->getMTime() >= $this->earliest_date && $this->getMTime() < $this->lastest_date )).PHP_EOL;
+        */
+        return (! $this->isFile() || ( $this->getMTime() >= $this->earliest_date && $this->getMTime() < $this->lastest_date ));
+    }
+    
+    public function getChildren()
+    {
+        return new static ($this->getInnerIterator()->getChildren(), $this->earliest_date, $this->lastest_date);
+    }
+} 

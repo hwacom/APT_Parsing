@@ -9,6 +9,7 @@ require_once dirname(__FILE__).'/../env/Config.inc';
 
 use Hwacom\APT_Parsing\dao\DatabaseAccessObject;
 use Hwacom\APT_Parsing\utils\FileUtils;
+use Hwacom\APT_Parsing\utils\GuidUtils;
 
 class CDRParsing
 {
@@ -19,12 +20,17 @@ class CDRParsing
     private $start_time = null;
     private $end_time = null;
     
+    private $batch_no = null;
+    
     public function __construct() {
         Logger::configure(dirname(__FILE__).'/../env/log4php_cdr_parsing.xml');
         $this->logger = Logger::getLogger('file');
         
+        $guid_utils = new GuidUtils();
+        $this->batch_no = $guid_utils->getGuid();
+        
         $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
-        $this->logger->info( ">>>>>  START [ " . date("Y-m-d H:i:sa") . " ]" );
+        $this->logger->info( ">>>>>  START [ " . date("Y-m-d H:i:sa") . " ] >> Batch no.: " . $this->batch_no );
         $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
         $this->start_time = time();
         
@@ -38,7 +44,7 @@ class CDRParsing
         $this->end_time = time();
         $spent_time = $this->end_time - $this->start_time;
         $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
-        $this->logger->info( "<<<<<  END [ " . date("Y-m-d H:i:sa") . " ] (執行時間: $spent_time 秒) " );
+        $this->logger->info( "<<<<<  END [ " . date("Y-m-d H:i:sa") . " ] (執行時間: $spent_time 秒)  >> Batch no.: " . $this->batch_no );
         $this->logger->info( "---------------------------------------------------------------------------------------------------------------------------------------------" );
         
         $this->logger = null;
