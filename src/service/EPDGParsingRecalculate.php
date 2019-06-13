@@ -107,6 +107,38 @@ class EPDGParsingRecalculate
             
             $this->logger->info( "***** " . count($file_paths) . " 份檔案需處理 *****" );
             
+            //TODO
+            echo "****************** 未分組前 *******************".PHP_EOL;
+            print_r($file_paths);
+            /*
+             * Step 1-1. 將前一步驟取得要重算的檔案清單，依設備分類檔案
+             */
+            $host_files = array();
+            foreach ($file_paths as $file_path) {
+                $path_array = explode("\\", $file_path);
+                $file_name = $path_array[count($path_array) - 1];
+                
+                if (!strpos($file_name, PARSING_HOST_NAME_SPLIT_SYMBOLS)) {
+                    continue;
+                }
+                
+                $tmp = explode(PARSING_HOST_NAME_SPLIT_SYMBOLS, $file_name);
+                $hostname = $tmp[0];
+                
+                if (!isset($host_files[$hostname])) {
+                    $host_files[$hostname] = array();
+                }
+                
+                array_push($host_files[$hostname], $file_path);
+            }
+            
+            //TODO
+            echo "****************** 分組後 *******************".PHP_EOL;
+            print_r($host_files);
+            if (empty($host_files)) {
+                throw new Exception("No files need to parsing.");
+            }
+            
             /*
              * Step 2. 初始化DB連線
              */
@@ -162,67 +194,80 @@ class EPDGParsingRecalculate
             $this->logger->info( "Step 2-8. 轉換成mapping資料" );
             $this->composeConfigMap($dataset);
             
-            $idx = 0;
-            foreach ($file_paths as $path) {
-                $idx++;
+            //TODO 調整迴圈架構變成二維陣列 [Device][filePath]
+            foreach ($host_files as $file_path) {
                 
-                //TODO Linux:/ Windows:\\
-                $tmp_arr = explode("/", $path);
-                $filename = $tmp_arr[count($tmp_arr) - 1];
+                $last_record_set = array();
+                $idx = 0;
+                $first_file = false;
                 
-                $this->logger->info( "============================================================================================================================================" );
-                $this->logger->info( "檔案$idx : $path " );
-                try {
+                foreach ($file_path as $path) {
                     /*
-                     * Step 3-1. 進行parsing作業
+                     * 第一筆檔案不做計算，將數值塞入 last_record_set 內，讓第二筆檔案計算用
                      */
-                    $this->logger->info( "Step 3-1. 進行parsing作業" );
-                    $parsing_set = $this->doParsing($path);
-                    //print_r($parsing_set);
+                    if ($idx == 0) {
+                        $first_file = true;
+                        
+                    } else {
+                        $first_file = false;
+                    }
                     
+                    $idx++;
+                    
+                    //TODO Linux:/ Windows:\\
+                    if (strpos($path, "\\")) {
+                        $tmp_arr = explode("\\", $path);
+                        
+                    } else if (strpos($path, "/")) {
+                        $tmp_arr = explode("/", $path);
+                    }
+                    
+                    $this->logger->info( "============================================================================================================================================" );
+                    $this->logger->info( "檔案$idx : $path " );
+                    try {
+                        /*
+                         * Step 3-1. 進行parsing作業
+                         */
+                        $this->logger->info( "Step 3-1. 進行parsing作業" );
+                        $parsing_set = $this->doParsing($path, $first_file, $last_record_set);
+                        
+                        //TODO
+                        //echo "******************** After parsing -> last_record_set ********************".PHP_EOL;
+                        //print_r($parsing_set);
+                        //print_r($last_record_set);
+                        
+                        if (!$first_file) {
+                            /*
+                             * Step 3-2. 進行KPI計算
+                             */
+                            $this->logger->info( "Step 3-2. 進行KPI計算" );
+                            $kpi_set = $this->doKpiCalculate();
+                            //print_r($kpi_set);
+                            
+                            /*
+                             * Step 3-3. 將parsing & KPI結果update至DB
+                             */
+                            $this->logger->info( "Step 3-3. 將parsing & KPI結果update至DB" );
+                            $this->insertOrUpdateData2DB($DAO, $parsing_set, $kpi_set);
+                        }
+                        
+                    } catch (Exception $t) {
+                        $this->logger->error( "Caught exception:  ".$t->getMessage() );
+                        continue;
+                        
+                    }// finally {
                     /*
-                     * Step 3-2. 進行KPI計算
+                     * Step 3-4. 初始化全域變數，處理下一個檔案
                      */
-                    $this->logger->info( "Step 3-2. 進行KPI計算" );
-                    $kpi_set = $this->doKpiCalculate();
-                    //print_r($kpi_set);
-                    
-                    /*
-                     * Step 3-3. 將parsing & KPI結果寫入DB
-                     */
-                    $this->logger->info( "Step 3-3. 將parsing & KPI結果寫入DB" );
-                    $this->insertData2DB($DAO, $parsing_set, $kpi_set);
-                    
-                    /*
-                     ** 處理成功則將檔案移至SUCCESS資料夾
-                     */
-                    $this->logger->info( "Step 3-4. 將檔案移動至 success 資料夾" );
-                    $new_path = PARSING_FILE_PROCESS_SUCCESS_PATH . $filename;
-                    rename($path, $new_path);
-                    
-                } catch (Exception $t) {
-                    $this->logger->error( "Caught exception:  ".$t->getMessage() );
-                    
-                    /*
-                     ** 處理失敗則將檔案移至ERROR資料夾
-                     */
-                    $this->logger->info( "Step 3-4. 將檔案移動至 error 資料夾" );
-                    $new_path = PARSING_FILE_PROCESS_ERROR_PATH . $filename;
-                    rename($path, $new_path);
-                    continue;
-                    
-                }// finally {
-                /*
-                 * Step 3-4. 初始化全域變數，處理下一個檔案
-                 */
-                $this->logger->info( "Step 3-4. 初始化全域變數" );
-                unset($GLOBALS['value_map']);
-                unset($GLOBALS['c_hostname']);
-                unset($GLOBALS['c_epochtime']);
-                unset($GLOBALS['c_localdate']);
-                unset($GLOBALS['c_localtime']);
-                unset($GLOBALS['c_uptime']);
-                //}
+                    $this->logger->info( "Step 3-4. 初始化全域變數" );
+                    unset($GLOBALS['value_map']);
+                    unset($GLOBALS['c_hostname']);
+                    unset($GLOBALS['c_epochtime']);
+                    unset($GLOBALS['c_localdate']);
+                    unset($GLOBALS['c_localtime']);
+                    unset($GLOBALS['c_uptime']);
+                    //}
+                }
             }
             
             $this->logger->info( "============================================================================================================================================" );
@@ -344,12 +389,17 @@ class EPDGParsingRecalculate
      * *進行檔案內容分析
      * @param array $dataset
      */
-    private function doParsing($path) {
+    private function doParsing($path, $first_file, &$last_record_set) {
         $dataset = array();
         
         // 分析檔名取出 [HOST_NAME] ============================================================================
-        //TODO Linux:/ Windows:\\
-        $path_slice = explode("/", $path);
+        if (strpos($path, "\\")) {
+            $path_slice = explode("\\", $path);
+            
+        } else if (strpos($path, "/")) {
+            $path_slice = explode("/", $path);
+        }
+        
         $file_name = $path_slice[count($path_slice)-1];
         
         $hostname = 'N/A';
@@ -371,6 +421,7 @@ class EPDGParsingRecalculate
         
         // 迴圈讀取檔案內容 ======================================================================================
         $row_num = 0;
+        echo "path: $path".PHP_EOL;
         $file = fopen($path, "r");
         if ($file !== false) {
             
@@ -404,10 +455,29 @@ class EPDGParsingRecalculate
                      ** 重算時不將資料寫入temp資料夾
                      ** 直接透過前面步驟取出的區間內檔案做處理
                      */
-                    //TODO
-                    $last_record_set = null;
+                    $uk_field = $this->table_uk_mapping[$table_name];
                     
-                    for ($idx = 0; $idx < count($fields); $idx++) {
+                    if (!empty($uk_field)) {
+                        $uk_key = "UK";
+                        $count = count($fields);
+                        for ($idx = 0; $idx < $count; $idx++) {
+                            if (array_key_exists($table_name, $this->field_mapping)) {
+                                $table_field_array = $this->field_mapping[$table_name];
+                                
+                                if (!empty($table_field_array[$idx])) {
+                                    $field_name = $table_field_array[$idx];
+                                    $field_value = ($field_name == FIELD_HOSTNAME) ? $hostname : $fields[$idx];
+                                    
+                                    if (in_array($field_name, $uk_field)) {
+                                        $uk_key = $uk_key."@~".$field_value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    $count = count($fields);
+                    for ($idx = 0; $idx < $count; $idx++) {
                         if (array_key_exists($table_name, $this->field_mapping)) {
                             $table_field_array = $this->field_mapping[$table_name];
                             
@@ -417,34 +487,39 @@ class EPDGParsingRecalculate
                                 
                                 $temp_data[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
                                 
-                                if (!empty($last_record_set)) {
-                                    /*
-                                     ** 若有前一筆資料，比對當前處理的欄位是否有設定需要做數值相減
-                                     */
-                                    $field_var = "%$field_name%";   //轉換為DB內設地的欄位名稱格式(前後以%包夾)
-                                    
-                                    if (array_key_exists($field_var, $this->field_subtraction_mapping)) {
+                                // 第一份檔案只記錄數值 for 第二份檔案計算用
+                                if (!$first_file) {
+                                    if (!empty($last_record_set)) {
                                         /*
-                                         ** 若此欄位有設定要做數值相減，則將當前CSV讀取的欄位值($field_value)減掉DB內前一筆紀錄的值($last_record)
+                                         ** 若有前一筆資料，比對當前處理的欄位是否有設定需要做數值相減
                                          */
-                                        $last_record = $last_record_set[0];
-                                        $last_value = $last_record[$field_name];
+                                        $field_var = "%$field_name%";   //轉換為DB內設地的欄位名稱格式(前後以%包夾)
                                         
-                                        if (empty($field_value)) {
-                                            $field_value = 0;
-                                        }
-                                        //echo "table_name: $db_table_name , field_name: $field_name , field_value: $field_value , last_value: $last_value \n";
-                                        $field_value -= $last_value;
-                                        
-                                        if ($field_value < 0) {
-                                            // Y190223, 設備可能因為重啟後數值初始化，導致計算時會得到負值，此種情況下就寫入當下CSV內的數值
-                                            $field_value = $fields[$idx];
+                                        if (array_key_exists($field_var, $this->field_subtraction_mapping)) {
+                                            /*
+                                             ** 若此欄位有設定要做數值相減，則將當前CSV讀取的欄位值($field_value)減掉DB內前一筆紀錄的值($last_record)
+                                             */
+                                            $last_record = $last_record_set[$uk_key];
+                                            $last_value = $last_record[$field_name];
+                                            
+                                            if (empty($field_value)) {
+                                                $field_value = 0;
+                                            }
+                                            
+                                            $field_value -= $last_value;
+                                            
+                                            if ($field_value < 0) {
+                                                // Y190223, 設備可能因為重啟後數值初始化，導致計算時會得到負值，此種情況下就寫入當下CSV內的數值
+                                                $field_value = $fields[$idx];
+                                            }
+                                            
+                                            //echo "uk_key: $uk_key "."@~"."$field_name >> last_value: $last_value >> new_value: $fields[$idx] >>>>>>>> now_value: $field_value".PHP_EOL;
                                         }
                                     }
+                                    
+                                    $data[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
+                                    $this->value_map[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
                                 }
-                                
-                                $data[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
-                                $this->value_map[$field_name] = $this->checkAbnormalDataContent($table_name, $idx, $field_value);
                             }
                         }
                     }
@@ -457,13 +532,20 @@ class EPDGParsingRecalculate
                     
                     array_push($table_array, $data);
                     array_push($temp_table_array, $temp_data);
+                    
+                    // 將該檔案的原始數值塞入 last_record_set，for 下一筆檔案計算用
+                    $last_record_set[$uk_key] = $temp_data;
                 }
                 
                 $row_num++;
             }
             
-            $dataset["MAIN"] = $table_array;
-            $dataset["TEMP"] = $temp_table_array;
+            //print_r($last_record_set);
+            
+            if (!$first_file) {
+                $dataset["MAIN"] = $table_array;
+                $dataset["TEMP"] = $temp_table_array;
+            }
         }
         // =================================================================================================
         
@@ -516,7 +598,8 @@ class EPDGParsingRecalculate
                 } else {
                     $part = explode("%", $formula);
                     
-                    for ($i = 1; $i < count($part); $i+=2) {
+                    $count = count($part);
+                    for ($i = 1; $i < $count; $i+=2) {
                         $map_key = "$part[$i]";
                         if (!array_key_exists($map_key, $this->value_map)) {
                             /*
@@ -569,19 +652,36 @@ class EPDGParsingRecalculate
      * @param array $parsingSet
      * @param array $kpiSet
      */
-    private function insertData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
+    private function insertOrUpdateData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
         /*
-         ** 更新/新增 Parsing 資料
+         ** 先刪除後新增 Parsing 資料
          */
         //TODO
         foreach ($parsing_set as $table_type => $table_array) {
             foreach ($table_array as $data) {
                 $table_name = $data[FIELD_TABLE_NAME];
-                
                 $insert_table = $this->table_mapping[$table_name];
                 unset($data[FIELD_TABLE_NAME]);
                 
                 $data_array = $data;
+                
+                // By UK 刪除
+                if (array_key_exists($table_name, $this->table_uk_mapping)) {
+                    $uk_fields = $this->table_uk_mapping[$table_name];
+                    
+                    if (!empty($uk_fields)) {
+                        $uk_columns = array();
+                        
+                        foreach ($uk_fields as $field_name) {
+                            if (in_array($field_name, $data_array)) {
+                                $uk_columns[$field_name] = $data_array[$field_name];
+                            }
+                        }
+                        //TODO
+                        $DAO->deleteByUK(strtolower($insert_table), $uk_columns);
+                    }
+                }
+                
                 $DAO->insert(strtolower($insert_table), $data_array);
             }
         }

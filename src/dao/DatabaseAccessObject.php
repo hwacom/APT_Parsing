@@ -77,7 +77,7 @@ class DatabaseAccessObject {
      */
     public function query($table = null, $condition = "1", $order_by = "1", $fields = "*", $limit = ""){
         $sql = "SELECT {$fields} FROM {$table} WHERE {$condition} ORDER BY {$order_by} {$limit}";
-        //echo "SQL: $sql\n";
+        echo "SQL: $sql\n";
         return $this->execute($sql);
     }
     
@@ -180,11 +180,12 @@ class DatabaseAccessObject {
         $id = mysqli_real_escape_string($this->link, $id);
         
         $setting_list = "";
-        for ($xx = 0; $xx < count($data_array); $xx++) {
+        $count = count($data_array);
+        for ($xx = 0; $xx < $count; $xx++) {
             list($key, $value) = each($data_array);
             $value = mysqli_real_escape_string($this->link, $value);
             $setting_list .= $key . "=" . "\"" . $value . "\"";
-            if ($xx != count($data_array) - 1)
+            if ($xx != $count - 1)
                 $setting_list .= ",";
         }
         $this->last_sql = "UPDATE " . $table . " SET " . $setting_list . " WHERE " . $key_column . " = " . "\"" . $id . "\"";
@@ -196,6 +197,47 @@ class DatabaseAccessObject {
             return $result;
         }
     }
+    
+    public function updateByUK($table = null, $data_array = null, $uk_array = null) {
+        if($table == null){
+            echo "table is null";
+            return false;
+        }
+        if(count($data_array) == 0) return false;
+        if(count($uk_array) == 0) return false;
+        
+        $id = mysqli_real_escape_string($this->link, $id);
+        
+        $setting_list = "";
+        $count = count($data_array);
+        for ($xx = 0; $xx < $count; $xx++) {
+            list($key, $value) = each($data_array);
+            $value = mysqli_real_escape_string($this->link, $value);
+            $setting_list .= $key . "=" . "\"" . $value . "\"";
+            if ($xx != $count - 1)
+                $setting_list .= ",";
+        }
+        
+        $uk_list = "";
+        $count = count($uk_array);
+        for ($xx = 0; $xx < $count; $xx++) {
+            list($key, $value) = each($uk_array);
+            $value = mysqli_real_escape_string($this->link, $value);
+            $uk_list .= $key . "=" . "\"" . $value . "\"";
+            if ($xx != $count - 1)
+                $uk_list .= ",";
+        }
+        
+        $this->last_sql = "UPDATE " . $table . " SET " . $setting_list . " WHERE " . $uk_list;
+        $result = mysqli_query($this->link, $this->last_sql);
+        
+        if (((is_object($this->link)) ? mysqli_error($this->link) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false))) {
+            echo "MySQL Update Error: " . ((is_object($this->link)) ? mysqli_error($this->link) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false));
+        } else {
+            return $result;
+        }
+    }
+    
     /**
      ** 這段可以刪除資料庫中的資料
      */
@@ -205,6 +247,23 @@ class DatabaseAccessObject {
         if($key_column===null) return false;
         
         return $this->execute("DELETE FROM $table WHERE " . $key_column . " = " . "\"" . $id . "\"");
+    }
+    
+    public function deleteByUK($table = null, $uk_array = null) {
+        if ($table===null) return false;
+        if($uk_array===null) return false;
+        
+        $uk_list = "";
+        $count = count($uk_array);
+        for ($xx = 0; $xx < $count; $xx++) {
+            list($key, $value) = each($uk_array);
+            $value = mysqli_real_escape_string($this->link, $value);
+            $uk_list .= $key . "=" . "\"" . $value . "\"";
+            if ($xx != $count - 1)
+                $uk_list .= ",";
+        }
+        
+        return $this->execute("DELETE FROM $table WHERE " . $uk_list);
     }
     
     /**

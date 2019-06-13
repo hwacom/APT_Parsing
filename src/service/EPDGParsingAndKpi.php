@@ -421,7 +421,8 @@ class EPDGParsingAndKpi
                     if (!empty($uk_field)) {
                         $default_condition = " 1=1 ";
                         $condition = $default_condition;
-                        for ($idx = 0; $idx < count($fields); $idx++) {
+                        $count = count($fields);
+                        for ($idx = 0; $idx < $count; $idx++) {
                             if (array_key_exists($table_name, $this->field_mapping)) {
                                 $table_field_array = $this->field_mapping[$table_name];
                                 
@@ -441,7 +442,8 @@ class EPDGParsingAndKpi
                         }
                     }
                     
-                    for ($idx = 0; $idx < count($fields); $idx++) {
+                    $count = count($fields);
+                    for ($idx = 0; $idx < $count; $idx++) {
                         if (array_key_exists($table_name, $this->field_mapping)) {
                             $table_field_array = $this->field_mapping[$table_name];
                             
@@ -550,7 +552,8 @@ class EPDGParsingAndKpi
                 } else {
                     $part = explode("%", $formula);
                     
-                    for ($i = 1; $i < count($part); $i+=2) {
+                    $count = count($part);
+                    for ($i = 1; $i < $count; $i+=2) {
                         $map_key = "$part[$i]";
                         if (!array_key_exists($map_key, $this->value_map)) {
                             /*

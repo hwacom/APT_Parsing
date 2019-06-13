@@ -43,9 +43,8 @@ class FileUtils {
         $directory = new RecursiveDirectoryIterator($dir_path);
         $filter = new FilesystemDateFilter($directory, $begin_date_time->getTimestamp(), $end_date_time->getTimestamp());
         
-        foreach(new RecursiveIteratorIterator($filter) as $filename) {
-            $path = $dir_path . $filename;
-            array_push($files_array, $path);
+        foreach(new RecursiveIteratorIterator($filter) as $path) {
+            array_push($files_array, $path->getPathname());
         }
         
         return $files_array;
@@ -71,30 +70,34 @@ class FileUtils {
             $pre_date_str = $pre_date_time->format("Y-m-d");
             
             //先看SUCCESS資料夾
-            $pre_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . "/" . $pre_date_str . "/";
+            $pre_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . $pre_date_str . "\\";
             echo "先看SUCCESS資料夾 >> $pre_date_dir".PHP_EOL;
             $files = $this->chkMatchedFiles($files, $pre_date_dir, $pre_date_time, $pre_end_date_time);
             
             //再看ERROR資料夾
-            $pre_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . "/" . $pre_date_str . "/";
+            $pre_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . $pre_date_str . "\\";
             echo "先看ERROR資料夾 >> $pre_date_dir".PHP_EOL;
             $files = $this->chkMatchedFiles($files, $pre_date_dir, $pre_date_time, $pre_end_date_time);
             
             $begin_date_time = date_create_from_format("Y-m-d H:i", $begin_date_str." 00:00");
+            
+        } else {
+            //Begin time 須往前推5分鐘，抓出前一次的數據才能做計算
+            date_sub($begin_date_time, date_interval_create_from_date_string('5 minutes'));
         }
         
         //先看SUCCESS資料夾
-        $begin_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . "/" . $begin_date_str . "/";
+        $begin_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . $begin_date_str . "\\";
         echo "先看SUCCESS資料夾 >> $begin_date_dir".PHP_EOL;
         $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
         
         //再看ERROR資料夾
-        $begin_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . "/" . $begin_date_str . "/";
+        $begin_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . $begin_date_str . "\\";
         echo "先看ERROR資料夾 >> $begin_date_dir".PHP_EOL;
         $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
         
         sort($files);   //由小到大排序
-        print_r($files);
+        //print_r($files);
         return $files;
     }
     
