@@ -106,17 +106,17 @@ class EPDGParsingRecalculate
             
             $this->logger->info( "***** " . count($file_paths) . " 份檔案需處理 *****" );
             
-            /*
+
             echo "****************** 未分組前 *******************".PHP_EOL;
             print_r($file_paths);
-            */
+
             
             /*
              * Step 1-1. 將前一步驟取得要重算的檔案清單，依設備分類檔案
              */
             $host_files = array();
             foreach ($file_paths as $file_path) {
-                $path_array = explode("\\", $file_path);
+                $path_array = explode("/", $file_path);
                 $file_name = $path_array[count($path_array) - 1];
                 
                 if (!strpos($file_name, PARSING_HOST_NAME_SPLIT_SYMBOLS)) {
@@ -133,10 +133,10 @@ class EPDGParsingRecalculate
                 array_push($host_files[$hostname], $file_path);
             }
             
-            /*
+            
             echo "****************** 分組後 *******************".PHP_EOL;
             print_r($host_files);
-            */
+            
             
             if (empty($host_files)) {
                 throw new Exception("No files need to parsing.");
@@ -396,22 +396,28 @@ class EPDGParsingRecalculate
     private function doParsing($path, $first_file, &$last_record_set) {
         $dataset = array();
         
+        //echo "(1): ".strpos($path, "/")." >= 0 >> ".(strpos($path, "/") >= 0)."; (2): ".strpos($path, "\\")." >= 0 >> ".(strpos($path, "\\") >= 0).PHP_EOL;
         // 分析檔名取出 [HOST_NAME] ============================================================================
-        if (strpos($path, "\\")) {
-            $path_slice = explode("\\", $path);
-            
-        } else if (strpos($path, "/")) {
+        /*
+        if (strpos($path, "/") >= 0) {
             $path_slice = explode("/", $path);
-        }
+            
+        } else if (strpos($path, "\\") >= 0) {
+            $path_slice = explode("\\", $path);
+        } 
+        */
+        $path_slice = explode("/", $path);
         
         $file_name = $path_slice[count($path_slice)-1];
         
-        $hostname = 'N/A';
+        echo "file_name: $file_name".PHP_EOL;
+        $hostname = '';
         
-        if (strpos($file_name, PARSING_HOST_NAME_SPLIT_SYMBOLS)) {
+        if (strpos($file_name, PARSING_HOST_NAME_SPLIT_SYMBOLS) != false) {
             $tmp = explode(PARSING_HOST_NAME_SPLIT_SYMBOLS, $file_name);
             $hostname = $tmp[0];
         }
+        echo "hostname: $hostname".PHP_EOL;
         /* php 5.3.3 不支援 const ARRAY
          foreach (PARSING_HOST_NAME_SPLIT_SYMBOLS as $symbol) {
          if (strpos($file_name, $symbol)) {

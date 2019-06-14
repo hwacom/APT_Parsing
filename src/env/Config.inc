@@ -10,19 +10,17 @@
     const OUTPUT_XML_FILE_PATH = "/var/www/html/xml/";
 
     // [PM Parsing source file setting] ======================================================================================================
-    /*
     const PARSING_FILE_lOCAL_PATH = "/root/epdg_henbgw/csv/";                       // 檔案路徑
     const PARSING_FILE_PROCESS_PATH = "/root/epdg_henbgw/process/";                 // 處理中檔案目錄
     const PARSING_FILE_PROCESS_SUCCESS_PATH = "/root/epdg_henbgw/process/success/"; // 處理成功檔案目錄
     const PARSING_FILE_PROCESS_ERROR_PATH = "/root/epdg_henbgw/process/error/";     // 處理失敗檔案目錄
-    */
     
-    
+    /*
     const PARSING_FILE_lOCAL_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\source\\";                       // 檔案路徑
     const PARSING_FILE_PROCESS_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\process\\";                 // 處理中檔案目錄
     const PARSING_FILE_PROCESS_SUCCESS_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\process\\success\\"; // 處理成功檔案目錄
     const PARSING_FILE_PROCESS_ERROR_PATH = "D:\\Work\\Hwacom_華電\@CASE\\2018.09_亞太-ePDG_Parsing\\Files\\process\\error\\";     // 處理失敗檔案目錄
-    
+    */
     
     const PARSING_FILE_IGNORE_ROW_COUNT = 1;                    // 設定檔案內容開頭忽略不處理的行數
     const PARSING_HOST_NAME_SPLIT_SYMBOLS = "_bulkstats";       // 設定用來解析檔名取得[HOST_NAME]的固定字眼 (用此字眼切割檔名後取陣列[0]=HOST_NAME)
