@@ -71,12 +71,12 @@ class FileUtils {
             
             //先看SUCCESS資料夾
             $pre_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . $pre_date_str . "\\";
-            echo "先看SUCCESS資料夾 >> $pre_date_dir".PHP_EOL;
+            //echo "先看SUCCESS資料夾 >> $pre_date_dir".PHP_EOL;
             $files = $this->chkMatchedFiles($files, $pre_date_dir, $pre_date_time, $pre_end_date_time);
             
             //再看ERROR資料夾
             $pre_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . $pre_date_str . "\\";
-            echo "先看ERROR資料夾 >> $pre_date_dir".PHP_EOL;
+            //echo "先看ERROR資料夾 >> $pre_date_dir".PHP_EOL;
             $files = $this->chkMatchedFiles($files, $pre_date_dir, $pre_date_time, $pre_end_date_time);
             
             $begin_date_time = date_create_from_format("Y-m-d H:i", $begin_date_str." 00:00");
@@ -88,12 +88,12 @@ class FileUtils {
         
         //先看SUCCESS資料夾
         $begin_date_dir = PARSING_FILE_PROCESS_SUCCESS_PATH . $begin_date_str . "\\";
-        echo "先看SUCCESS資料夾 >> $begin_date_dir".PHP_EOL;
+        //echo "先看SUCCESS資料夾 >> $begin_date_dir".PHP_EOL;
         $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
         
         //再看ERROR資料夾
         $begin_date_dir = PARSING_FILE_PROCESS_ERROR_PATH . $begin_date_str . "\\";
-        echo "先看ERROR資料夾 >> $begin_date_dir".PHP_EOL;
+        //echo "先看ERROR資料夾 >> $begin_date_dir".PHP_EOL;
         $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
         
         sort($files);   //由小到大排序

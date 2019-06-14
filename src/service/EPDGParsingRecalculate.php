@@ -91,8 +91,7 @@ class EPDGParsingRecalculate
         try {
             $this->begin_date_time = date_create_from_format("Y-m-d H:i", $begin_time);
             $this->end_date_time = date_create_from_format("Y-m-d H:i", $end_time);
-            echo "begin_time: $begin_time , end_time: $end_time " . PHP_EOL;
-            print "begin_date_time: " . $this->begin_date_time->format('Y-m-d H:i:s') . ", end_date_time: " . $this->end_date_time->format('Y-m-d H:i:s') . PHP_EOL;
+            $this->logger->info( "[ Begin_time: $begin_time , End_time: $end_time ]");
             
             /*
              * Step 1. 判斷輸入的日期區間，取得需要重算的檔案
@@ -107,9 +106,11 @@ class EPDGParsingRecalculate
             
             $this->logger->info( "***** " . count($file_paths) . " 份檔案需處理 *****" );
             
-            //TODO
+            /*
             echo "****************** 未分組前 *******************".PHP_EOL;
             print_r($file_paths);
+            */
+            
             /*
              * Step 1-1. 將前一步驟取得要重算的檔案清單，依設備分類檔案
              */
@@ -132,9 +133,11 @@ class EPDGParsingRecalculate
                 array_push($host_files[$hostname], $file_path);
             }
             
-            //TODO
+            /*
             echo "****************** 分組後 *******************".PHP_EOL;
             print_r($host_files);
+            */
+            
             if (empty($host_files)) {
                 throw new Exception("No files need to parsing.");
             }
@@ -194,7 +197,7 @@ class EPDGParsingRecalculate
             $this->logger->info( "Step 2-8. 轉換成mapping資料" );
             $this->composeConfigMap($dataset);
             
-            //TODO 調整迴圈架構變成二維陣列 [Device][filePath]
+            //調整迴圈架構變成二維陣列 [Device][filePath]
             foreach ($host_files as $file_path) {
                 
                 $last_record_set = array();
@@ -203,7 +206,7 @@ class EPDGParsingRecalculate
                 
                 foreach ($file_path as $path) {
                     /*
-                     * 第一筆檔案不做計算，將數值塞入 last_record_set 內，讓第二筆檔案計算用
+                     ** 第一筆檔案不做計算，將數值塞入 last_record_set 內，讓第二筆檔案計算用
                      */
                     if ($idx == 0) {
                         $first_file = true;
@@ -214,16 +217,18 @@ class EPDGParsingRecalculate
                     
                     $idx++;
                     
-                    //TODO Linux:/ Windows:\\
+                    //Linux:/ Windows:\\
+                    /*
                     if (strpos($path, "\\")) {
                         $tmp_arr = explode("\\", $path);
                         
                     } else if (strpos($path, "/")) {
                         $tmp_arr = explode("/", $path);
                     }
+                    */
                     
                     $this->logger->info( "============================================================================================================================================" );
-                    $this->logger->info( "檔案$idx : $path " );
+                    $this->logger->info( "[檔案$idx : $path ]" );
                     try {
                         /*
                          * Step 3-1. 進行parsing作業
@@ -231,7 +236,6 @@ class EPDGParsingRecalculate
                         $this->logger->info( "Step 3-1. 進行parsing作業" );
                         $parsing_set = $this->doParsing($path, $first_file, $last_record_set);
                         
-                        //TODO
                         //echo "******************** After parsing -> last_record_set ********************".PHP_EOL;
                         //print_r($parsing_set);
                         //print_r($last_record_set);
@@ -248,7 +252,7 @@ class EPDGParsingRecalculate
                              * Step 3-3. 將parsing & KPI結果update至DB
                              */
                             $this->logger->info( "Step 3-3. 將parsing & KPI結果update至DB" );
-                            $this->insertOrUpdateData2DB($DAO, $parsing_set, $kpi_set);
+                            $this->deleteAndInsertData2DB($DAO, $parsing_set, $kpi_set);
                         }
                         
                     } catch (Exception $t) {
@@ -421,7 +425,7 @@ class EPDGParsingRecalculate
         
         // 迴圈讀取檔案內容 ======================================================================================
         $row_num = 0;
-        echo "path: $path".PHP_EOL;
+        //echo "path: $path".PHP_EOL;
         $file = fopen($path, "r");
         if ($file !== false) {
             
@@ -512,8 +516,6 @@ class EPDGParsingRecalculate
                                                 // Y190223, 設備可能因為重啟後數值初始化，導致計算時會得到負值，此種情況下就寫入當下CSV內的數值
                                                 $field_value = $fields[$idx];
                                             }
-                                            
-                                            //echo "uk_key: $uk_key "."@~"."$field_name >> last_value: $last_value >> new_value: $fields[$idx] >>>>>>>> now_value: $field_value".PHP_EOL;
                                         }
                                     }
                                     
@@ -539,8 +541,6 @@ class EPDGParsingRecalculate
                 
                 $row_num++;
             }
-            
-            //print_r($last_record_set);
             
             if (!$first_file) {
                 $dataset["MAIN"] = $table_array;
@@ -578,7 +578,7 @@ class EPDGParsingRecalculate
     }
     
     /**
-     * *計算KPI數值
+     ** 計算KPI數值
      * @param array $dataset
      */
     private function doKpiCalculate() {
@@ -652,13 +652,18 @@ class EPDGParsingRecalculate
      * @param array $parsingSet
      * @param array $kpiSet
      */
-    private function insertOrUpdateData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
+    private function deleteAndInsertData2DB($DAO, $parsing_set = array(), $kpi_set = array()) {
         /*
          ** 先刪除後新增 Parsing 資料
          */
-        //TODO
-        foreach ($parsing_set as $table_type => $table_array) {
-            foreach ($table_array as $data) {
+        $fixed_uk_columns = array (
+            FIELD_EPOCHTIME, FIELD_LOCALDATE, FIELD_LOCALTIME, FIELD_UPTIME
+        );
+        
+        $main_table = $parsing_set['MAIN'];
+        foreach ($main_table as $data) {
+            //只處理[MAIN]table；[TEMP]不處理
+            try {
                 $table_name = $data[FIELD_TABLE_NAME];
                 $insert_table = $this->table_mapping[$table_name];
                 unset($data[FIELD_TABLE_NAME]);
@@ -669,34 +674,61 @@ class EPDGParsingRecalculate
                 if (array_key_exists($table_name, $this->table_uk_mapping)) {
                     $uk_fields = $this->table_uk_mapping[$table_name];
                     
+                    foreach ($fixed_uk_columns as $fixed_key) {
+                        array_push($uk_fields, $fixed_key);
+                    }
+                    
                     if (!empty($uk_fields)) {
                         $uk_columns = array();
                         
                         foreach ($uk_fields as $field_name) {
-                            if (in_array($field_name, $data_array)) {
+                            if (array_key_exists($field_name, $data_array)) {
                                 $uk_columns[$field_name] = $data_array[$field_name];
                             }
                         }
-                        //TODO
+                        
                         $DAO->deleteByUK(strtolower($insert_table), $uk_columns);
                     }
                 }
                 
                 $DAO->insert(strtolower($insert_table), $data_array);
+                
+            } catch (Exception $t) {
+                $this->logger->error( "Caught exception:  ".$t->getMessage() );
             }
         }
         
         /*
-         ** 更新/新增 KPI 資料
+         ** 先刪除後新增 KPI 資料
          */
-        //TODO
         foreach ($kpi_set as $data) {
-            $insert_table = strtolower($data[FIELD_TABLE_NAME]);
-            
-            unset($data[FIELD_TABLE_NAME]);
-            
-            $data_array = $data;
-            $DAO->insert($insert_table, $data_array);
+            try {
+                $kpi_uk_columns = array (
+                    FIELD_HOST_NAME => "",
+                    FIELD_EPOCHTIME => "",
+                    FIELD_LOCALDATE => "",
+                    FIELD_LOCALTIME => "",
+                    FIELD_UPTIME => "",
+                );
+                
+                $insert_table = strtolower($data[FIELD_TABLE_NAME]);
+                unset($data[FIELD_TABLE_NAME]);
+                
+                $data_array = $data;
+                
+                foreach ($kpi_uk_columns as $field_name => $field_value) {
+                    if (array_key_exists($field_name, $data_array)) {
+                        $kpi_uk_columns[$field_name] = $data_array[$field_name];
+                    }
+                }
+
+                $DAO->deleteByUK(strtolower($insert_table), $kpi_uk_columns);
+                
+                $DAO->insert($insert_table, $data_array);
+                
+            } catch (Exception $t) {
+                $this->logger->error( "Caught exception:  ".$t->getMessage() );
+            }
         }
     }
 }

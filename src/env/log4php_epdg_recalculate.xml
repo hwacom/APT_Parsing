@@ -3,7 +3,8 @@
     	<layout class="LoggerLayoutPattern">
             <param name="conversionPattern" value="%date{T Y-M-d D H:i:s} [%class{0}] [%-5level] %msg%n" />
         </layout>
-        <param name="file" value="/root/epdg_henbgw/log/%s/recalculate_%s.log" />
+        <!-- <param name="file" value="/root/epdg_henbgw/log/%s/recalculate_%s.log" /> -->
+        <param name="file" value="D:/log/APT_Parsing/%s/recalculate_%s.log" />
         <param name="datePattern" value="Y-m-d" />
     </appender>
     <appender name="console" class="LoggerAppenderConsole">

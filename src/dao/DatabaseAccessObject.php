@@ -251,19 +251,33 @@ class DatabaseAccessObject {
     
     public function deleteByUK($table = null, $uk_array = null) {
         if ($table===null) return false;
-        if($uk_array===null) return false;
+        if ($uk_array===null) return false;
         
         $uk_list = "";
         $count = count($uk_array);
-        for ($xx = 0; $xx < $count; $xx++) {
-            list($key, $value) = each($uk_array);
-            $value = mysqli_real_escape_string($this->link, $value);
-            $uk_list .= $key . "=" . "\"" . $value . "\"";
-            if ($xx != $count - 1)
-                $uk_list .= ",";
+        
+        $xx = 0;
+        foreach($uk_array as $field_name => $field_value) {
+            try {
+                $this->link->set_charset("utf8");
+                $field_value = mysqli_real_escape_string($this->link, $field_value);
+                
+            } catch (Exception $e) {
+                $this->logger->error( "Caught exception:  ".$e->getMessage() );
+            }
+            
+            $uk_list .= "`".$field_name."` = " . "\"" . $field_value . "\"";
+            
+            if ($xx != $count - 1) {
+                $uk_list .= " AND ";
+            }
+            
+            $xx++;
         }
         
-        return $this->execute("DELETE FROM $table WHERE " . $uk_list);
+        $sql = "DELETE FROM `".$table."` WHERE " . $uk_list;
+        //echo "sql: $sql".PHP_EOL;
+        return $this->execute($sql);;
     }
     
     /**
