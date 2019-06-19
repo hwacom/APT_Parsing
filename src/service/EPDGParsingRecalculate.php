@@ -116,6 +116,7 @@ class EPDGParsingRecalculate
              */
             $host_files = array();
             foreach ($file_paths as $file_path) {
+                $file_path = str_replace("\\", "/", $file_path);
                 $path_array = explode("/", $file_path);
                 $file_name = $path_array[count($path_array) - 1];
                 
@@ -406,6 +407,7 @@ class EPDGParsingRecalculate
             $path_slice = explode("\\", $path);
         } 
         */
+        $path = str_replace("\\", "/", $path);
         $path_slice = explode("/", $path);
         
         $file_name = $path_slice[count($path_slice)-1];

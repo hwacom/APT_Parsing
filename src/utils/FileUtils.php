@@ -44,7 +44,19 @@ class FileUtils {
         $filter = new FilesystemDateFilter($directory, $begin_date_time->getTimestamp(), $end_date_time->getTimestamp());
         
         foreach(new RecursiveIteratorIterator($filter) as $path) {
-            array_push($files_array, $path->getPathname());
+            //array_push($files_array, $path->getPathname());
+            
+            $file_path = str_replace("\\", "/", $path->getPathname());
+            
+            $path_array = explode("/", $file_path);
+            $key = $path_array[count($path_array) - 1];
+            
+            /*
+             ** 因為備份檔可能放在 success 或 error 資料夾
+             ** 改用檔案名稱作key值，後續也改成by key值排序
+             ** 即可避免不同資料夾路徑不同造成排序錯位問題
+             */
+            $files_array[$key] = $file_path;
         }
         
         return $files_array;
@@ -56,6 +68,7 @@ class FileUtils {
      * @param $end_time
      */
     public function getLocalFileBySpecifyInterval($begin_date_time, $end_date_time) {
+        $return_files = array();
         $files = array();
         
         $begin_date_str = $begin_date_time->format("Y-m-d");
@@ -96,8 +109,9 @@ class FileUtils {
         echo "Second lookup ERROR directory >> $begin_date_dir".PHP_EOL;
         $files = $this->chkMatchedFiles($files, $begin_date_dir, $begin_date_time, $end_date_time);
         
-        //TODO 若同時有success&error資料夾檔案，排序會亂掉 (路徑已不一致)
-        sort($files);   //由小到大排序
+        //改用key值(檔案名稱)排序
+        ksort($files);   //由Key值(file_name)由小到大排序
+        
         //print_r($files);
         return $files;
     }
