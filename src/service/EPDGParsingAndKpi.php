@@ -616,7 +616,6 @@ class EPDGParsingAndKpi
             foreach ($table_array as $data) {
                 $table_name = $data[FIELD_TABLE_NAME];
                 
-                //echo "table_type: $table_type\n";
                 if ($table_type == "TEMP") {
                     $table_name = str_replace("_temp", "", $table_name);
                 }

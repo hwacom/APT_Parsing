@@ -77,7 +77,7 @@ class DatabaseAccessObject {
      */
     public function query($table = null, $condition = "1", $order_by = "1", $fields = "*", $limit = ""){
         $sql = "SELECT {$fields} FROM {$table} WHERE {$condition} ORDER BY {$order_by} {$limit}";
-        echo "SQL: $sql\n";
+        //echo "SQL: $sql\n";
         return $this->execute($sql);
     }
     
@@ -149,8 +149,6 @@ class DatabaseAccessObject {
         $data = join(",", $tmp_dat);
         
         $this->last_sql = "INSERT INTO `" . $table . "` (" . $columns . ") VALUES (" . $data . ")";
-        
-        //echo "$this->last_sql;\n";
         
         mysqli_query($this->link, $this->last_sql);
         
